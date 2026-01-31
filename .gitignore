@@ -6,6 +6,9 @@ config*.json
 logfile.txt
 user_data/*
 !user_data/strategy/sample_strategy.py
+!user_data/india_strategy.yaml
+!user_data/strategies
+!user_data/strategies/*.py
 !user_data/notebooks
 !user_data/models
 !user_data/freqaimodels
@@ -116,3 +119,23 @@ target/
 !config_examples/config_freqai.example.json
 
 docker-compose-*.yml
+
+# Virtualenv / caches
+.ruff_cache/
+
+# Your evidence bundles and logs
+artifacts/
+
+# Runtime generated outputs
+user_data/generated/
+
+# Archived/rotated user_data trees
+user_data.old_*/
+
+# Accept-run archives
+**/generated/accept_runs/
+
+# Common log formats
+*.jsonl
+
+generated/

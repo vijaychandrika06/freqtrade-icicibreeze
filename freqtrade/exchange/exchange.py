@@ -3,6 +3,7 @@
 Cryptocurrency Exchanges support
 """
 
+import freqtrade.exchange  # noqa: F401
 import asyncio
 import inspect
 import logging
@@ -13,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from math import floor, isnan
 from threading import Lock
 from typing import Any, Literal, TypeGuard, TypeVar
+
 
 import ccxt
 import ccxt.pro as ccxt_pro

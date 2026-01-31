@@ -1,7 +1,11 @@
 from freqtrade_client.ft_rest_client import FtRestClient
 
 
+<<<<<<< HEAD
 __version__ = "2026.1-dev"
+=======
+__version__ = "2025.12"
+>>>>>>> phase4-icicibreeze-exchange
 
 if "dev" in __version__:
     from pathlib import Path

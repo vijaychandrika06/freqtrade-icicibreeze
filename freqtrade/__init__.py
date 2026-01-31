@@ -1,6 +1,10 @@
 """Freqtrade bot"""
 
-__version__ = "2026.1-dev"
+<<<<<<< HEAD
+__version__ = "2025.12"
+=======
+__version__ = "2025.12"
+>>>>>>> phase4-icicibreeze-exchange
 
 if "dev" in __version__:
     from pathlib import Path

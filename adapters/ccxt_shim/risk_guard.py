@@ -1,0 +1,214 @@
+import json
+import logging
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+logger = logging.getLogger(__name__)
+
+HALT_FILE = Path("user_data/generated/runtime/live_halt.json")
+
+
+class RiskGuard:
+    def __init__(self, config: dict[str, Any]):
+        self.config = config.get("risk_guard", {})
+        self.enabled = self.config.get("enabled", True)
+        self.max_trades_per_day = self.config.get("max_trades_per_day", 10)
+        self.max_open_positions = self.config.get("max_open_positions", 1)
+        self.green_day_lock_pct = self.config.get("green_day_profit_lock_pct", 1.0)
+        self.cutoff_time_str = self.config.get("intraday_entry_cutoff_ist", "15:05")
+
+        self.spread_guard = self.config.get("spread_guard", {})
+        self.spread_enabled = self.spread_guard.get("enabled", True)
+        self.max_spread_pct = self.spread_guard.get("max_spread_pct", 0.40)
+
+        self.allow_exits_when_blocked = self.config.get("allow_exits_when_blocked", True)
+
+        # In-memory state (non-persistent for P15, now Persistent P40)
+        self.daily_trades_count = 0
+        self.ist_tz = ZoneInfo("Asia/Kolkata")
+        self.last_reset_date = self.get_now_ist().strftime("%Y-%m-%d")
+
+        # P40: Persistent Halts
+        self._halt_state = {
+            "entries_blocked": False,
+            "block_reason": None,
+            "consecutive_losses": 0,
+            "daily_loss_sum": 0.0,
+        }
+        self.load_state()
+
+    def get_now_ist(self) -> datetime:
+        # P15: Allow forcing time via ENV for deterministic testing
+        forced_now = os.environ.get("FT_IST_NOW")
+        if forced_now:
+            try:
+                # Expect ISO format: "2026-01-26T15:10:00+05:30"
+                return datetime.fromisoformat(forced_now)
+            except ValueError:
+                logger.warning(f"Invalid FT_IST_NOW format: {forced_now}. Using system time.")
+
+        return datetime.now(self.ist_tz)
+
+    def _reset_daily_counters_if_needed(self, now_ist: datetime):
+        today_str = now_ist.strftime("%Y-%m-%d")
+        if today_str != self.last_reset_date:
+            logger.info(f"RiskGuard: Resetting daily counters. New Day: {today_str}")
+            self.daily_trades_count = 0
+            self.last_reset_date = today_str
+
+    def should_block_entry(self, symbol: str, side: str, price_surface: dict) -> tuple[bool, str]:
+        """
+        Check if entry should be blocked.
+        Returns: (blocked: bool, reason: str)
+        """
+        if not self.enabled:
+            return False, ""
+
+        # P15: Pnl blocking logic is placeholder until Ledger implementation
+        # Can force block via env for testing
+        if os.environ.get("FT_FORCE_RISK_BLOCK"):
+            return True, "force_block_env"
+
+        # 1. Green Day Profit Lock (Simulated via Env for P15)
+        # In real impl, this would query Ledger or Cache
+        force_daily_profit = os.environ.get("RISK_FORCE_DAILY_PROFIT_RATIO")
+        if force_daily_profit:
+            try:
+                current_profit_pct = float(force_daily_profit) * 100
+                if current_profit_pct >= self.green_day_lock_pct:
+                    return (
+                        True,
+                        f"green_day_lock({current_profit_pct:.2f}% >= {self.green_day_lock_pct:.2f}%)",
+                    )
+            except ValueError:
+                pass
+
+        # 2. Check Side (Exits may be exempt)
+        is_entry = side.lower() == "buy"
+        if not is_entry and self.allow_exits_when_blocked:
+            return False, ""
+
+        now_ist = self.get_now_ist()
+        self._reset_daily_counters_if_needed(now_ist)
+
+        # 2. Max Trades Per Day
+        if self.daily_trades_count >= self.max_trades_per_day:
+            msg = "max_trades_per_day"
+            from adapters.ccxt_shim.alerts import trigger
+
+            trigger("RISK_BLOCK", f"{msg}: {self.daily_trades_count} >= {self.max_trades_per_day}")
+            return True, msg
+
+        # 3. Intraday Cutoff
+        current_time_str = now_ist.strftime("%H:%M")
+        if current_time_str >= self.cutoff_time_str:
+            msg = "intraday_cutoff"
+            from adapters.ccxt_shim.alerts import trigger
+
+            trigger("RISK_BLOCK", f"{msg}: {current_time_str} >= {self.cutoff_time_str}")
+            return True, msg
+
+        # 4. Spread Guard (Entries Only)
+        if is_entry and self.spread_enabled and price_surface:
+            bid = price_surface.get("bid", 0.0)
+            ask = price_surface.get("ask", 0.0)
+            if bid > 0 and ask > 0:
+                mid = (bid + ask) / 2
+                spread_pct = ((ask - bid) / mid) * 100
+                if spread_pct > self.max_spread_pct:
+                    msg = "spread_guard"
+                    from adapters.ccxt_shim.alerts import trigger
+
+                    trigger("RISK_BLOCK", f"{msg}: {spread_pct:.2f}% > {self.max_spread_pct:.2f}%")
+                    return True, msg
+
+        return False, ""
+
+    def record_trade_success(self, symbol: str, side: str):
+        """
+        Record a successful trade submission to update counters.
+        """
+        if not self.enabled:
+            return
+
+        is_entry = side.lower() == "buy"
+        if is_entry:
+            self.daily_trades_count += 1
+            logger.info(
+                f"RiskGuard: Trade recorded. Daily Count: {self.daily_trades_count}/{self.max_trades_per_day}"
+            )
+        self.persist_state()
+
+    def _ensure_dir(self):
+        try:
+            HALT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create risk halt dir: {e}")
+
+    def load_state(self):
+        try:
+            if HALT_FILE.exists():
+                with HALT_FILE.open("r") as f:
+                    data = json.load(f)
+
+                # Verify day consistency
+                loaded_date = data.get("date")
+                if loaded_date == self.last_reset_date:
+                    self.daily_trades_count = data.get("daily_trades_count", 0)
+                    self._halt_state = data.get("halt_state", self._halt_state)
+                    logger.info("RiskGuard: Loaded persistent state from disk.")
+                else:
+                    logger.info("RiskGuard: Stored state is from previous day. Ignoring.")
+        except Exception as e:
+            logger.error(f"Failed to load risk state: {e}")
+
+    def persist_state(self):
+        self._ensure_dir()
+        data = {
+            "date": self.last_reset_date,
+            "daily_trades_count": self.daily_trades_count,
+            "halt_state": self._halt_state,
+            "updated_at": self.get_now_ist().isoformat(),
+        }
+        try:
+            tmp_path = HALT_FILE.with_suffix(".tmp")
+            with tmp_path.open("w") as f:
+                json.dump(data, f, indent=2)
+            tmp_path.rename(HALT_FILE)
+        except Exception as e:
+            logger.error(f"Failed to persist risk state: {e}")
+
+    def record_loss(self, amount_abs: float):
+        """
+        Record a realized loss to update counters/halts.
+        """
+        self._halt_state["daily_loss_sum"] += abs(amount_abs)
+        self._halt_state["consecutive_losses"] += 1
+
+        # Check thresholds
+        max_daily = self.config.get("max_daily_loss", 0)
+        max_consecutive = self.config.get("max_consecutive_losses", 0)
+
+        if max_daily > 0 and self._halt_state["daily_loss_sum"] >= max_daily:
+            self._halt_state["entries_blocked"] = True
+            self._halt_state["block_reason"] = (
+                f"max_daily_loss ({self._halt_state['daily_loss_sum']} >= {max_daily})"
+            )
+
+        if max_consecutive > 0 and self._halt_state["consecutive_losses"] >= max_consecutive:
+            self._halt_state["entries_blocked"] = True
+            self._halt_state["block_reason"] = (
+                f"max_consecutive_losses ({self._halt_state['consecutive_losses']} >= {max_consecutive})"
+            )
+
+        self.persist_state()
+
+    def record_win(self):
+        """
+        Record a realized win to reset consecutive loss counter.
+        """
+        self._halt_state["consecutive_losses"] = 0
+        self.persist_state()
