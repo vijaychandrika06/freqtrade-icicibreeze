@@ -1,10 +1,15 @@
-#!/usr/bin/env python3
+import logging
 import json
-import os
 import sys
 from pathlib import Path
 import argparse
 from collections import Counter
+
+# Observability Compliance: Use logger
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("p43_reconcile")
 
 DEFAULT_CACHE = Path("user_data/generated/runtime/order_id_cache.json")
 
@@ -21,11 +26,11 @@ def main():
         if not args.cache.exists():
             cache = {}
         else:
-            with open(args.cache, "r") as f:
+            with args.cache.open("r") as f:
                 cache = json.load(f)
 
         if args.mock_exchange and args.mock_exchange.exists():
-            with open(args.mock_exchange, "r") as f:
+            with args.mock_exchange.open("r") as f:
                 exchange_orders = json.load(f)
         else:
             exchange_orders = []
@@ -58,13 +63,15 @@ def main():
             results["status"] = "OK"
             results["summary"] = "State is consistent."
 
-        # Output JSON for machine parsing
+        # Output JSON for machine parsing - still stdout for the gate script
         print(json.dumps(results, indent=2, sort_keys=True))
 
         return 0 if results["status"] != "ERROR" else 1
 
-    except Exception as e:
-        print(json.dumps({"status": "EXCEPTION", "summary": str(e)}, indent=2))
+    except Exception:
+        logger.exception("Exception during reconciliation")
+        # Ensure minimum JSON output even on failure
+        print(json.dumps({"status": "EXCEPTION", "summary": "See logs for details"}, indent=2))
         return 1
 
 
