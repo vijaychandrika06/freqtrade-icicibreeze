@@ -10,8 +10,14 @@ Live trading requires a fresh "deadman" file every 10 minutes.
 **To Renew:**
 
 ```bash
+# Manual
 touch user_data/secrets/deadman_live.ok
+# Via Script
+python3 scripts/ops/p41_deadman_renew.py
 ```
+
+**Automated Renewal:**
+Enable the systemd timer in `deploy/systemd/deadman-renew.timer` to refresh the lease every 5 minutes.
 
 **To Stop (Emergency):**
 
@@ -29,7 +35,15 @@ If `RiskGuard` blocks entries (Max Loss/Consecutive Losses):
 2. Delete `user_data/generated/runtime/live_halt.json`.
 3. Restart.
 
-### 1.3 Readiness Failures
+### 1.3 Restart Reconciliation
+
+After a restart, run the reconciliation script to ensure local state matches the exchange:
+
+```bash
+python3 scripts/ops/p43_reconcile.py
+```
+
+### 1.4 Readiness Failures
 
 If `LiveReadiness` fails:
 

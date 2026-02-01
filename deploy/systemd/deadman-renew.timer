@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer to renew Freqtrade ICICI Breeze Deadman Lease
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=deadman-renew.service
+
+[Install]
+WantedBy=timers.target

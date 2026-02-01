@@ -62,6 +62,10 @@ ALL_GATES=(
     "p38_soak_stability"
     "p39_ops_hardening"
     "p40_live_readiness"
+    "p41_deadman_auto_renew"
+    "p42_incident_response"
+    "p43_restart_reconcile"
+    "p44_release_bundle"
 )
 
 # Parse flags
@@ -102,6 +106,10 @@ HARDENED_GATES=(
     "p35_ops_runbook"
     "p38_soak_stability"
     "p40_live_readiness"
+    "p41_deadman_auto_renew"
+    "p42_incident_response"
+    "p43_restart_reconcile"
+    "p44_release_bundle"
 )
 
 function is_hardened() {

@@ -217,6 +217,12 @@ class BreezeCCXT(ccxt.Exchange):
             return True
         return False
 
+    def _check_fault_inject(self, op: str):
+        fault = os.environ.get("FT_FAULT_INJECT")
+        if fault == op:
+             logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
+             raise OperationalException(f"FT_FAULT_INJECT: {op}")
+
     def describe(self):
         return self.deep_extend(
             super().describe(),
@@ -556,6 +562,7 @@ class BreezeCCXT(ccxt.Exchange):
         limit: int | None = None,
         params: dict | None = None,
     ):
+        self._check_fault_inject("data_fetch_fail")
         # Validate symbol first - raises OperationalException if invalid
         s_params = self._parse_symbol(symbol)
 
@@ -644,6 +651,7 @@ class BreezeCCXT(ccxt.Exchange):
     ):
         logger.info(f"BreezeCCXT.create_order (Sync) called for {symbol} {side}")
         try:
+            self._check_fault_inject("create_order_fail")
             self.rate_limiter.allow("create_order")
             self.market_hours.assert_can_create_order(side, symbol)
             self.degraded_guard.assert_can_order(side, symbol)
@@ -1177,6 +1185,12 @@ class BreezeAsyncCCXT(ccxt_async.Exchange):
 
     def _is_mock_mode(self) -> bool:
         return self.sync_exchange._is_mock_mode()
+
+    def _check_fault_inject(self, op: str):
+        fault = os.environ.get("FT_FAULT_INJECT")
+        if fault == op:
+             logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
+             raise OperationalException(f"FT_FAULT_INJECT: {op}")
 
     def describe(self):
         res = {

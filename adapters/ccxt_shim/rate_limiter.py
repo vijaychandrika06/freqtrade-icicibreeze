@@ -63,6 +63,10 @@ class RateLimiter:
           - mode='sleep': Sleeps until tokens available
           - mode='block': Raises OperationalException
         """
+        if os.environ.get("FT_FAULT_INJECT") == "rate_limit":
+            logger.warning("FT_FAULT_INJECT: rate_limit forced")
+            self._raise_block(op, cost)
+
         if not self.enabled:
             return
 
