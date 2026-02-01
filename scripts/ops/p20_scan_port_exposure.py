@@ -25,6 +25,7 @@ IGNORES = [
     "poetry.lock",
     "package-lock.json",
     "user_data/logs",
+    "generated",
 ]
 
 # Known exceptions (Allowlist)

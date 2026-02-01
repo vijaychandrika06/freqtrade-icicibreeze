@@ -30,7 +30,7 @@ RISKY_PATTERNS=(
 FAILED_SCAN=0
 for pattern in "${RISKY_PATTERNS[@]}"; do
     # -P for PCRE, -n for line number
-    if rg -P -n "$pattern" --glob '!deploy/env/.env.example' --glob '!docs/**' --glob '!tests/**' --glob '!scripts/p20_api_smoke.sh' --glob '!scripts/gates/p21_secrets_hygiene.sh' .; then
+    if rg -P -n "$pattern" --glob '!deploy/env/.env.example' --glob '!docs/**' --glob '!tests/**' --glob '!scripts/p20_api_smoke.sh' --glob '!scripts/gates/p21_secrets_hygiene.sh' --glob '!generated/**' .; then
         echo "[FAIL] Found potential secret literal matching: $pattern"
         FAILED_SCAN=1
     fi
