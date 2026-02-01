@@ -148,6 +148,9 @@ class BreezeCCXT(ccxt.Exchange):
                 # But create_order will block if paper_mode is on.
                 logger.info("Initializing Breeze session with provided credentials.")
                 self.breeze.generate_session(api_secret=api_secret, session_token=session_token)
+                # P35.5: Force inject secret to match successful standalone test_subscription.py
+                self.breeze.secret_key = api_secret
+                self.breeze.api_secret = api_secret
             except Exception:
                 logger.error("Failed to initialize Breeze session. Please check your credentials.")
 
@@ -220,8 +223,8 @@ class BreezeCCXT(ccxt.Exchange):
     def _check_fault_inject(self, op: str):
         fault = os.environ.get("FT_FAULT_INJECT")
         if fault == op:
-             logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
-             raise OperationalException(f"FT_FAULT_INJECT: {op}")
+            logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
+            raise OperationalException(f"FT_FAULT_INJECT: {op}")
 
     def describe(self):
         return self.deep_extend(
@@ -1189,8 +1192,8 @@ class BreezeAsyncCCXT(ccxt_async.Exchange):
     def _check_fault_inject(self, op: str):
         fault = os.environ.get("FT_FAULT_INJECT")
         if fault == op:
-             logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
-             raise OperationalException(f"FT_FAULT_INJECT: {op}")
+            logger.warning(f"FT_FAULT_INJECT TRIPPED: {op}")
+            raise OperationalException(f"FT_FAULT_INJECT: {op}")
 
     def describe(self):
         res = {

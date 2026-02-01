@@ -54,8 +54,13 @@ class Icicibreeze(Exchange):
     def _init_ccxt(
         self, exchange_config: dict[str, Any], sync: bool, ccxt_kwargs: dict[str, Any]
     ) -> Any:
-        # Determine Mode
-        mode = self._config.get("icici_mode") or exchange_config.get("icici_mode") or "stub"
+        # Determine Mode: Default to real if key/secret exists, else stub
+        mode = self._config.get("icici_mode") or exchange_config.get("icici_mode")
+        if not mode:
+            if exchange_config.get("key") and exchange_config.get("secret"):
+                mode = "real"
+            else:
+                mode = "stub"
 
         if mode == "stub":
             logger.info("Initializing Icicibreeze in Stub mode.")
