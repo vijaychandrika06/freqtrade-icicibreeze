@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+source .venv/bin/activate
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+
+# Ensure UI assets exist (idempotent)
+echo "Ensuring UI assets are installed..."
+freqtrade install-ui >/dev/null 2>&1 || true
+
+# Build UI-safe config (injects api_server auth)
+echo "Generating UI-safe configuration..."
+python scripts/make_config_ui.py \
+  --in  user_data/generated/manual_select/config.json \
+  --out user_data/generated/manual_select/config_ui.json \
+  --ip 127.0.0.1 \
+  --port 8080 \
+  --verbosity error
+
+# Start UI
+echo "Starting Freqtrade Webserver..."
+exec freqtrade webserver \
+  -c user_data/generated/manual_select/config_ui.json \
+  --userdir user_data \
+  -v
