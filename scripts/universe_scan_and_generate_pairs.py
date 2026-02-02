@@ -201,10 +201,16 @@ def _parse_args() -> argparse.Namespace:
         help="Path to FONSEScripMaster.txt",
     )
     parser.add_argument(
-        "--mode",
-        choices=["mock", "real"],
-        default="mock",
-        help="Reserved for compatibility (default: mock)",
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Limit number of underlyings to scan in this run",
+    )
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help="Starting index for scanning",
     )
     return parser.parse_args()
 
@@ -365,7 +371,34 @@ def main() -> None:
     security_master = _load_contracts(Path(args.security_master) if args.security_master else None)
     today = _kolkata_today()
 
-    pairs, report = _build_pairs_report(universe, option_policy, security_master, today)
+    # Apply batching
+    all_underlyings = sorted(set(universe.stocks) | set(universe.indices))
+    total_total = len(all_underlyings)
+
+    offset = args.offset % total_total if total_total > 0 else 0
+    batch_size = args.batch_size or total_total
+
+    # Slice the universe
+    sliced = all_underlyings[offset : offset + batch_size]
+    # Wrap around if batch_size exceeds remaining
+    if len(sliced) < batch_size and total_total > 0:
+        remaining = batch_size - len(sliced)
+        sliced.extend(all_underlyings[0 : min(remaining, offset)])
+
+    logger.info(
+        f"Scanning batch of {len(sliced)} underlyings (Offset: {offset}, Total: {total_total})"
+    )
+
+    # Temporarily override universe for reporting
+    # We maintain indices/stocks separation but filter by sliced
+    sub_universe = UniverseConfig(
+        indices=[u for u in universe.indices if u in sliced],
+        stocks=[u for u in universe.stocks if u in sliced],
+        top_n_stocks=universe.top_n_stocks,
+        total_pairs_cap=universe.total_pairs_cap,
+    )
+
+    pairs, report = _build_pairs_report(sub_universe, option_policy, security_master, today)
 
     _write_json(out_path, pairs)
     _write_json(report_path, report)
