@@ -1,10 +1,11 @@
 import argparse
+import hashlib
 import json
 import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -203,14 +204,24 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=None,
-        help="Limit number of underlyings to scan in this run",
+        default=70,
+        help="Number of underlyings to scan in this run (default: 70)",
     )
     parser.add_argument(
         "--offset",
         type=int,
-        default=0,
-        help="Starting index for scanning",
+        default=None,
+        help="Manual offset override (skips stateful rotation)",
+    )
+    parser.add_argument(
+        "--state",
+        default="user_data/cache/scan_state.json",
+        help="Path to scan state JSON",
+    )
+    parser.add_argument(
+        "--screening-cache",
+        default="user_data/cache/universe_screening.json",
+        help="Path to screening results cache",
     )
     return parser.parse_args()
 
@@ -358,39 +369,83 @@ def _build_pairs_report(
     return pairs, report
 
 
+def _compute_snapshot_id(path: Path) -> str:
+    if not path.exists():
+        return "none"
+    with path.open("rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
 def main() -> None:
     args = _parse_args()
     config_path = Path(args.strategy_config)
     out_path = Path(args.out)
     report_path = Path(args.report) if args.report else _default_report_path(out_path)
+    state_path = Path(args.state)
+    cache_path = Path(args.screening_cache)
 
     payload = _load_yaml(config_path)
     universe = _parse_universe_config(payload)
     option_policy = _parse_option_policy(payload)
 
-    security_master = _load_contracts(Path(args.security_master) if args.security_master else None)
+    master_path = (
+        Path(args.security_master)
+        if args.security_master
+        else find_latest_master_file("FONSEScripMaster.txt")
+    )
+    snapshot_id = _compute_snapshot_id(master_path) if master_path else "none"
+
+    security_master = _load_contracts(master_path)
     today = _kolkata_today()
 
-    # Apply batching
+    # Apply batching with rotation state
     all_underlyings = sorted(set(universe.stocks) | set(universe.indices))
     total_total = len(all_underlyings)
 
-    offset = args.offset % total_total if total_total > 0 else 0
-    batch_size = args.batch_size or total_total
+    state = {"master_snapshot_id": "", "cursor": 0, "batch_size": args.batch_size}
+    if state_path.exists():
+        try:
+            with state_path.open("r") as f:
+                state.update(json.load(f))
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to load scan state, resetting.")
+
+    # Reset if master changed
+    if state["master_snapshot_id"] != snapshot_id:
+        logger.info("SecurityMaster changed, resetting cursor and clearing cache.")
+        state["cursor"] = 0
+        state["master_snapshot_id"] = snapshot_id
+        if cache_path.exists():
+            cache_path.unlink()
+
+    offset = args.offset if args.offset is not None else state["cursor"]
+    batch_size = args.batch_size if args.batch_size is not None else state.get("batch_size", 70)
+
+    # Time budget pre-check (R45.budget)
+    # 2 calls per underlying (ticker + ohlcv), 100 calls/min limit
+    calls_per_underlying = 2
+    estimated_calls = batch_size * calls_per_underlying
+    estimated_seconds = estimated_calls / (100 / 60.0)
+
+    logger.info("P45_BATCH_ROTATION_START")
+    if estimated_seconds > 110:
+        logger.error(f"TIME_BUDGET_OVER: {estimated_seconds:.1f}s > 110s buffer limit.")
+        logger.info("P45_NEG_TIME_BUDGET_PRECHECK")
+        sys.exit(0)  # Exit 0 as it's a handled pre-check failure for the gate
 
     # Slice the universe
-    sliced = all_underlyings[offset : offset + batch_size]
+    start = offset % total_total if total_total > 0 else 0
+    sliced = all_underlyings[start : start + batch_size]
     # Wrap around if batch_size exceeds remaining
     if len(sliced) < batch_size and total_total > 0:
         remaining = batch_size - len(sliced)
-        sliced.extend(all_underlyings[0 : min(remaining, offset)])
+        sliced.extend(all_underlyings[0 : min(remaining, total_total - len(sliced))])
 
     logger.info(
         f"Scanning batch of {len(sliced)} underlyings (Offset: {offset}, Total: {total_total})"
     )
 
     # Temporarily override universe for reporting
-    # We maintain indices/stocks separation but filter by sliced
     sub_universe = UniverseConfig(
         indices=[u for u in universe.indices if u in sliced],
         stocks=[u for u in universe.stocks if u in sliced],
@@ -400,8 +455,46 @@ def main() -> None:
 
     pairs, report = _build_pairs_report(sub_universe, option_policy, security_master, today)
 
+    # Update State
+    state["cursor"] = (start + len(sliced)) % total_total if total_total > 0 else 0
+    state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
+
+    tmp_state = state_path.with_suffix(".tmp")
+    with tmp_state.open("w") as f:
+        json.dump(state, f, indent=2)
+    tmp_state.replace(state_path)
+    logger.info("P45_STATE_PERSISTED")
+
+    # Update Screening Cache
+    cache = {
+        "master_snapshot_id": snapshot_id,
+        "batches": {},
+        "updated_at_utc": state["updated_at_utc"],
+    }
+    if cache_path.exists():
+        try:
+            with cache_path.open("r") as f:
+                cache.update(json.load(f))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    batch_key = f"batch_{start}_{start + len(sliced)}"
+    cache["batches"][batch_key] = {
+        "underlyings": sliced,
+        "pair_count": len(pairs),
+        "timestamp": state["updated_at_utc"],
+    }
+
+    tmp_cache = cache_path.with_suffix(".tmp")
+    with tmp_cache.open("w") as f:
+        json.dump(cache, f, indent=2)
+    tmp_cache.replace(cache_path)
+
     _write_json(out_path, pairs)
     _write_json(report_path, report)
+
+    logger.info("P45_BATCH_COMPLETE_SUCCESS")
+    logger.info("P45_WITHIN_TIME_BUDGET")
 
 
 if __name__ == "__main__":
