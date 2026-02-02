@@ -15,6 +15,8 @@ import ccxt
 import ccxt.async_support as ccxt_async
 from breeze_connect import BreezeConnect
 
+from adapters.ccxt_shim import health_snapshot
+from adapters.ccxt_shim.degraded_mode import DegradedModeGuard
 from adapters.ccxt_shim.icicibreeze.mock_ohlcv import synth_ohlcv, timeframe_to_ms
 from adapters.ccxt_shim.instrument import (
     InstrumentSpec,
@@ -22,23 +24,20 @@ from adapters.ccxt_shim.instrument import (
     format_pair,
     parse_pair,
 )
+from adapters.ccxt_shim.live_readiness import LiveReadiness
+from adapters.ccxt_shim.market_hours import MarketHoursGuard
+from adapters.ccxt_shim.order_idempotency import OrderIdempotency
+from adapters.ccxt_shim.order_router import OrderRouter
+from adapters.ccxt_shim.paper_ledger import PaperLedger
+from adapters.ccxt_shim.rate_limiter import RateLimiter
+from adapters.ccxt_shim.risk_guard import RiskGuard
 from adapters.ccxt_shim.security_master import (
     find_latest_master_file,
     load_nfo_options_master,
     load_nse_cash_master,
 )
-from adapters.ccxt_shim.market_hours import MarketHoursGuard
-from adapters.ccxt_shim.risk_guard import RiskGuard
-from adapters.ccxt_shim import health_snapshot
-from adapters.ccxt_shim.order_router import OrderRouter
-from adapters.ccxt_shim.rate_limiter import RateLimiter
-from adapters.ccxt_shim.degraded_mode import DegradedModeGuard
-from adapters.ccxt_shim.live_readiness import LiveReadiness
-from adapters.ccxt_shim.order_idempotency import OrderIdempotency
 from freqtrade.exceptions import OperationalException
 
-
-from adapters.ccxt_shim.paper_ledger import PaperLedger
 
 logger = logging.getLogger(__name__)
 
@@ -656,11 +655,9 @@ class BreezeCCXT(ccxt.Exchange):
     @property
     def _is_paper_trading(self) -> bool:
         """
-        True if dry_run.
-        Note: Mock mode (FT_MOCK) does NOT imply paper trading for logic gates.
-        It allows testing 'Live' logic with stubbed adapter.
+        True if dry_run or adapter started in paper_mode.
         """
-        return self.config.get("dry_run", False)
+        return self.config.get("dry_run", False) or getattr(self, "paper_mode", False)
 
     def create_order(
         self, symbol, order_type, side, amount, price=None, params: dict | None = None

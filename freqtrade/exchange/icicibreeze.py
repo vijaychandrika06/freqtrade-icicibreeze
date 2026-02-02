@@ -3,8 +3,10 @@ from typing import Any
 
 import ccxt
 import ccxt.async_support as ccxt_async
+
 from freqtrade.exchange.common import MAP_EXCHANGE_CHILDCLASS
 from freqtrade.exchange.exchange import Exchange
+
 
 try:
     import ccxt.pro as ccxt_pro
@@ -28,10 +30,10 @@ def patch_ccxt():
     # We use a wrapper to handle the configuration-based mode selection if possible,
     # or just default to the real Shim for this p06 gate.
 
-    setattr(ccxt, "icicibreeze", BreezeCCXT)
-    setattr(ccxt_async, "icicibreeze", BreezeAsyncCCXT)
+    ccxt.icicibreeze = BreezeCCXT
+    ccxt_async.icicibreeze = BreezeAsyncCCXT
     if ccxt_pro:
-        setattr(ccxt_pro, "icicibreeze", BreezeAsyncCCXT)
+        ccxt_pro.icicibreeze = BreezeAsyncCCXT
 
 
 patch_ccxt()
