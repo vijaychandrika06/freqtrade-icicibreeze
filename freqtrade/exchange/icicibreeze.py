@@ -55,12 +55,22 @@ class Icicibreeze(Exchange):
         self, exchange_config: dict[str, Any], sync: bool, ccxt_kwargs: dict[str, Any]
     ) -> Any:
         # Determine Mode: Default to real if key/secret exists, else stub
+        # P35.6 Check both 'key'/'secret' (Freqtrade) and 'apiKey'/'secret' (CCXT standard)
+        config_key = exchange_config.get("key") or exchange_config.get("apiKey")
+        config_secret = exchange_config.get("secret")
+
         mode = self._config.get("icici_mode") or exchange_config.get("icici_mode")
         if not mode:
-            if exchange_config.get("key") and exchange_config.get("secret"):
+            if config_key and config_secret:
                 mode = "real"
             else:
                 mode = "stub"
+
+        # Ensure we propagate the correct keys into exchange_config for the shim
+        if config_key:
+            exchange_config["key"] = config_key
+        if config_secret:
+            exchange_config["secret"] = config_secret
 
         if mode == "stub":
             logger.info("Initializing Icicibreeze in Stub mode.")

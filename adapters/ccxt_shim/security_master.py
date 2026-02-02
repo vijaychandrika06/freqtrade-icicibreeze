@@ -24,11 +24,12 @@ class SecurityMaster:
 
 
 def _strip_dataframe_strings(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = [c.strip() for c in df.columns]
+    # P35.3: Clean headers of quotes and whitespace, and normalize to lowercase
+    df.columns = [c.strip().strip('"').strip("'").lower() for c in df.columns]
     object_columns = df.select_dtypes(include=["object"]).columns
     for column in object_columns:
         df[column] = df[column].map(
-            lambda value: value.strip() if isinstance(value, str) else value
+            lambda value: value.strip().strip('"').strip("'") if isinstance(value, str) else value
         )
     return df
 
@@ -39,10 +40,10 @@ def _normalize_expiry_date(series: pd.Series) -> tuple[pd.Series, pd.Series]:
 
 
 def _normalize_option_type(value: Any) -> str | None:
-    mapping = {"CE": "CE", "CALL": "CE", "PE": "PE", "PUT": "PE"}
+    mapping = {"CE": "CE", "CALL": "CE", "PE": "PE", "PUT": "PE", "XX": "XX"}
     if isinstance(value, str):
-        return mapping.get(value.strip().upper())
-    return None
+        return mapping.get(value.strip().upper(), "XX")
+    return "XX"
 
 
 def _warn_legacy_expiry_once() -> None:
@@ -95,14 +96,17 @@ def load_nfo_options_master(file_path: str) -> dict[str, Any]:
             "company_search": {},
         }
 
+    # Fallback for Underlyer -> ShortName if missing (newer files)
+    if "underlyer" not in df.columns and "shortname" in df.columns:
+        df["underlyer"] = df["shortname"]
+
     required = [
-        "Token",
-        "ShortName",
-        "ExpiryDate",
-        "StrikePrice",
-        "OptionType",
-        "Underlyer",
-        "LotSize",
+        "token",
+        "shortname",
+        "expirydate",
+        "strikeprice",
+        "optiontype",
+        "lotsize",
     ]
     missing = [c for c in required if c not in df.columns]
     if missing:
@@ -116,25 +120,27 @@ def load_nfo_options_master(file_path: str) -> dict[str, Any]:
             "company_search": {},
         }
 
-    if "DeleteFlag" in df.columns:
-        df = df[df["DeleteFlag"].astype(str) == "0"]
+    if "deleteflag" in df.columns:
+        # Don't drop if NaN (active) or 0 (active)
+        df = df[df["deleteflag"].isna() | (df["deleteflag"].astype(str) == "0")]
 
-    inst_col = "InstrumentName" if "InstrumentName" in df.columns else "Series"
+    inst_col = "instrumentname" if "instrumentname" in df.columns else "series"
     if inst_col in df.columns:
         df = df[df[inst_col].isin(["OPTIDX", "OPTSTK", "FUTIDX", "FUTSTK"])]
 
-    df["expiry_yyyymmdd"], df["expiry_iso"] = _normalize_expiry_date(df["ExpiryDate"])
+    df["expiry_yyyymmdd"], df["expiry_iso"] = _normalize_expiry_date(df["expirydate"])
     df = df.dropna(subset=["expiry_yyyymmdd"])
 
-    df["OptionType"] = df["OptionType"].map(_normalize_option_type)
-    df["StrikePrice"] = pd.to_numeric(df["StrikePrice"], errors="coerce")
-    df["LotSize"] = pd.to_numeric(df["LotSize"], errors="coerce")
-    if "TickSize" not in df.columns:
-        df["TickSize"] = 0.05
-    df["TickSize"] = pd.to_numeric(df["TickSize"], errors="coerce").fillna(0.05)
+    df["optiontype"] = df["optiontype"].fillna("XX").map(_normalize_option_type)
+    df["strikeprice"] = pd.to_numeric(df["strikeprice"], errors="coerce")
+    df["lotsize"] = pd.to_numeric(df["lotsize"], errors="coerce")
+    if "ticksize" not in df.columns:
+        df["ticksize"] = 0.05
+    df["ticksize"] = pd.to_numeric(df["ticksize"], errors="coerce").fillna(0.05)
 
-    options_df = df[df["OptionType"].isin(["CE", "PE"]) & df["StrikePrice"].notna()].copy()
-    futures_df = df[df["OptionType"].isna()].copy()
+    options_df = df[df["optiontype"].isin(["CE", "PE"]) & df["strikeprice"].notna()].copy()
+    # P35.4: In Breeze master, XX is the OptionType for Futures
+    futures_df = df[df["optiontype"] == "XX"].copy()
 
     by_contract = {}
     by_future = {}
@@ -142,26 +148,41 @@ def load_nfo_options_master(file_path: str) -> dict[str, Any]:
     company_search = {}
 
     for _, row in options_df.iterrows():
-        underlying = str(row["Underlyer"]).upper()
+        # P35.1: In newer ZIP format, ShortName is the API Stock Code (e.g. RELIND)
+        # ExchangeCode column often contains the Popular Name (e.g. RELIANCE)
+        stock_code = str(row.get("shortname", row.get("underlyer", ""))).upper()
+        popular_name = str(row.get("exchangecode", stock_code)).upper()
+        underlying = stock_code
+
         expiry_yyyymmdd = row["expiry_yyyymmdd"]
         expiry_iso = row["expiry_iso"]
-        strike = float(row["StrikePrice"])
-        right = row["OptionType"]
-        token = str(row["Token"])
-        contract_key = (underlying, expiry_yyyymmdd, strike, right)
+        strike = float(row["strikeprice"])
+        right = row["optiontype"]
+        token = str(row["token"])
+
+        # We index by BOTH stock_code and popular_name if they differ
+        contract_keys = [(underlying, expiry_yyyymmdd, strike, right)]
+        if popular_name != stock_code:
+            contract_keys.append((popular_name, expiry_yyyymmdd, strike, right))
+
         info = {
             "token": token,
             "underlying": underlying,
+            "stock_code": stock_code,
+            "popular_name": popular_name,
             "expiry_yyyymmdd": expiry_yyyymmdd,
             "expiry_iso": expiry_iso,
             "strike": strike,
             "right": right,
-            "lot_size": int(row["LotSize"]) if pd.notna(row["LotSize"]) else 1,
-            "tick_size": float(row["TickSize"]),
-            "short_name": str(row["ShortName"]),
-            "company_name": str(row.get("CompanyName", row["ShortName"])).lower(),
+            "lot_size": int(row["lotsize"]) if pd.notna(row["lotsize"]) else 1,
+            "tick_size": float(row["ticksize"]),
+            "short_name": stock_code,
+            "company_name": str(row.get("companyname", stock_code)).lower(),
         }
-        by_contract[contract_key] = info
+
+        for k in contract_keys:
+            by_contract[k] = info
+
         if underlying not in by_underlying:
             by_underlying[underlying] = {"expiries": set(), "strikes": set()}
         by_underlying[underlying]["expiries"].add(expiry_yyyymmdd)
@@ -169,22 +190,32 @@ def load_nfo_options_master(file_path: str) -> dict[str, Any]:
         company_search[info["company_name"]] = underlying
 
     for _, row in futures_df.iterrows():
-        underlying = str(row["Underlyer"]).upper()
+        stock_code = str(row.get("shortname", row.get("underlyer", ""))).upper()
+        popular_name = str(row.get("exchangecode", stock_code)).upper()
+        underlying = stock_code
+
         expiry_yyyymmdd = row["expiry_yyyymmdd"]
         expiry_iso = row["expiry_iso"]
-        token = str(row["Token"])
-        future_key = (underlying, expiry_yyyymmdd)
+        token = str(row["token"])
+
+        future_keys = [(underlying, expiry_yyyymmdd)]
+        if popular_name != stock_code:
+            future_keys.append((popular_name, expiry_yyyymmdd))
+
         info = {
             "token": token,
             "underlying": underlying,
+            "stock_code": stock_code,
+            "popular_name": popular_name,
             "expiry_yyyymmdd": expiry_yyyymmdd,
             "expiry_iso": expiry_iso,
-            "lot_size": int(row["LotSize"]) if pd.notna(row["LotSize"]) else 1,
-            "tick_size": float(row["TickSize"]),
-            "short_name": str(row["ShortName"]),
-            "company_name": str(row.get("CompanyName", row["ShortName"])).lower(),
+            "lot_size": int(row["lotsize"]) if pd.notna(row["lotsize"]) else 1,
+            "tick_size": float(row["ticksize"]),
+            "short_name": stock_code,
+            "company_name": str(row.get("companyname", stock_code)).lower(),
         }
-        by_future[future_key] = info
+        for k in future_keys:
+            by_future[k] = info
         company_search[info["company_name"]] = underlying
 
     logger.info(
@@ -209,7 +240,11 @@ def load_nse_cash_master(file_path: str) -> dict[str, Any]:
         logger.error(f"Failed to read NSE Cash SecurityMaster {file_path}: {e}")
         return {"by_symbol": {}, "company_search": {}}
 
-    required = ["Token", "ShortName", "Series", "Underlyer", "LotSize"]
+    # Fallback for Underlyer -> ShortName if missing (newer files)
+    if "underlyer" not in df.columns and "shortname" in df.columns:
+        df["underlyer"] = df["shortname"]
+
+    required = ["token", "shortname", "series", "lotsize"]
     missing = [c for c in required if c not in df.columns]
     if missing:
         logger.error(
@@ -219,27 +254,39 @@ def load_nse_cash_master(file_path: str) -> dict[str, Any]:
         )
         return {"by_symbol": {}, "company_search": {}}
 
-    df = df[df["Series"].isin(["EQ", "BE", "SM", "ST"])]
-    if "DeleteFlag" in df.columns:
-        df = df[df["DeleteFlag"].astype(str) == "0"]
+    df = df[df["series"].isin(["EQ", "BE", "SM", "ST"])]
+    if "deleteflag" in df.columns:
+        # Don't drop if NaN (active) or 0 (active)
+        df = df[df["deleteflag"].isna() | (df["deleteflag"].astype(str) == "0")]
 
     by_symbol = {}
     company_search = {}
 
     for _, row in df.iterrows():
-        symbol = str(row["ShortName"]).upper()
-        token = str(row["Token"])
+        # P35.1: In newer ZIP format, ShortName is API Stock Code (RELIND)
+        # ExchangeCode column is the Popular Name (RELIANCE)
+        stock_code = str(row.get("shortname", "")).upper()
+        popular_name = str(row.get("exchangecode", stock_code)).upper()
+        token = str(row["token"])
+
         info = {
             "token": token,
-            "symbol": symbol,
-            "lot_size": int(row["LotSize"]) if pd.notna(row["LotSize"]) else 1,
-            "tick_size": float(row.get("TickSize", 0.05)),
-            "company_name": str(row.get("CompanyName", row["ShortName"])).lower(),
+            "symbol": stock_code,
+            "stock_code": stock_code,
+            "popular_name": popular_name,
+            "lot_size": int(row["lotsize"]) if pd.notna(row["lotsize"]) else 1,
+            "tick_size": float(row.get("ticksize", 0.05)),
+            "company_name": str(row.get("companyname", stock_code)).lower(),
         }
-        by_symbol[symbol] = info
-        company_search[info["company_name"]] = symbol
 
-    logger.info(f"Parsed {len(by_symbol)} active NSE Cash scrips")
+        # Map both to allow Freqtrade to use popular names in whitelist
+        by_symbol[stock_code] = info
+        if popular_name != stock_code:
+            by_symbol[popular_name] = info
+
+        company_search[info["company_name"]] = stock_code
+
+    logger.info(f"Parsed {len(by_symbol)} active NSE Cash scrips (including popular name aliases)")
     return {"by_symbol": by_symbol, "company_search": company_search}
 
 

@@ -154,6 +154,19 @@ class BreezeCCXT(ccxt.Exchange):
             except Exception:
                 logger.error("Failed to initialize Breeze session. Please check your credentials.")
 
+        # P35.2: Daily Security Master Sync (8:15 AM)
+        if not self._is_mock_mode():
+            try:
+                from scripts.ops.sync_security_master import needs_sync, sync
+
+                if needs_sync():
+                    logger.info("Automatic Security Master sync triggered...")
+                    sync()
+            except ImportError:
+                logger.warning("sync_security_master.py not found in scripts/ops/.")
+            except Exception as e:
+                logger.error(f"Automatic Security Master sync failed: {e}")
+
     def _setup_mock_breeze(self):
         logger.info("Setting up Mock Breeze SDK mode for validation.")
 
@@ -285,7 +298,7 @@ class BreezeCCXT(ccxt.Exchange):
 
     def _build_breeze_params(self, spec: InstrumentSpec, info: dict[str, Any]) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "stock_code": spec.underlying,
+            "stock_code": info.get("stock_code", spec.underlying),
             "exchange_code": "NSE" if spec.type == InstrumentType.CASH else "NFO",
             "product_type": "cash",
         }
@@ -660,26 +673,23 @@ class BreezeCCXT(ccxt.Exchange):
             self.degraded_guard.assert_can_order(side, symbol)
 
             # P30: Live Order Execution (Guarded) - HOISTED
-            # Checked EARLY to prevent risk counter increment on blocked attempts
-            # Fallback to exchange dict if root key stripped
-            icici_conf = self.config.get("icicibreeze") or self.config.get("exchange", {}).get(
-                "icicibreeze", {}
-            )
-            live_config = icici_conf.get("live_trading", {})
-            config_enabled = live_config.get("enabled", False)
-            env_enabled = os.environ.get("FT_ENABLE_LIVE_ORDERS") == "1"
-
-            if not (config_enabled and env_enabled):
-                # P30 Live Guard Block
-                # Defined in policy_codes.py as "Live Trading Guard: Blocked"
-                msg = (
-                    "Live Trading Guard: Blocked. "
-                    f"Config={config_enabled}, Env(FT_ENABLE_LIVE_ORDERS)={env_enabled}"
+            if not self._is_paper_trading:
+                icici_conf = self.config.get("icicibreeze") or self.config.get("exchange", {}).get(
+                    "icicibreeze", {}
                 )
-                logger.warning(msg)
-                logger.warning(f"DEBUG: icicibreeze config: {self.config.get('icicibreeze')}")
-                health_snapshot.update("policy_block")
-                raise OperationalException(msg)
+                live_config = icici_conf.get("live_trading", {})
+                config_enabled = live_config.get("enabled", False)
+                env_enabled = os.environ.get("FT_ENABLE_LIVE_ORDERS") == "1"
+
+                if not (config_enabled and env_enabled):
+                    # P30 Live Guard Block
+                    msg = (
+                        "Live Trading Guard: Blocked. "
+                        f"Config={config_enabled}, Env(FT_ENABLE_LIVE_ORDERS)={env_enabled}"
+                    )
+                    logger.warning(msg)
+                    health_snapshot.update("policy_block")
+                    raise OperationalException(msg)
 
             # P40: Live Readiness & Deadman
             if not self._is_paper_trading:

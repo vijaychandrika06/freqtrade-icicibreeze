@@ -81,15 +81,27 @@ EOF
     fi
     
     echo "4. Verifying Data Content..."
-    FILE_PATH="$DATA_DIR/icicibreeze/RELIANCE_INR-5m.json"
-    if [ ! -f "$FILE_PATH" ]; then
-        echo "[FAIL] Data file not found: $FILE_PATH"
+    # P35.7: Support both .json and .feather, and handle subfolder variations
+    FOUND_FILE=""
+    for ext in "json" "feather"; do
+        for path in "$DATA_DIR/icicibreeze/RELIANCE_INR-5m.$ext" "$DATA_DIR/RELIANCE_INR-5m.$ext"; do
+            if [ -f "$path" ]; then
+                FOUND_FILE="$path"
+                break 2
+            fi
+        done
+    done
+
+    if [ -z "$FOUND_FILE" ]; then
+        echo "[FAIL] Data file not found in $DATA_DIR"
+        ls -R "$DATA_DIR"
         finish_gate 1
     fi
     
-    # Check row count > 0 (naively check file size > 100 bytes or use jq if available)
-    if [ -s "$FILE_PATH" ]; then
-        SIZE=$(wc -c < "$FILE_PATH")
+    echo "[INFO] Found data file: $FOUND_FILE"
+    # Check row count > 0 (naively check file size > 100 bytes)
+    if [ -s "$FOUND_FILE" ]; then
+        SIZE=$(wc -c < "$FOUND_FILE")
         if [ "$SIZE" -lt 100 ]; then
             echo "[FAIL] Data file too small ($SIZE bytes)"
             finish_gate 1
