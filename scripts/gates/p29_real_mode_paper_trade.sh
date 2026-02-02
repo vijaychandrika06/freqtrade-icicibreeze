@@ -48,6 +48,10 @@ assert ob["bids"][0][0] < ob["asks"][0][0]
 elif [ "$GATE_MODE" == "neg" ]; then
     echo ">>> Gate P29: Negative (Missing Creds / Invalid Config)..."
     
+    # Force unset creds and real mode to ensure determinism
+    unset BREEZE_API_KEY BREEZE_API_SECRET BREEZE_SESSION_TOKEN
+    export BREEZE_MOCK=0
+
     # 1. Check Missing Creds
     cat <<EOF > "$ARTIFACT_DIR/neg_check.py"
 import os
@@ -56,6 +60,7 @@ sys.path.append(os.getcwd())
 from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 
 def check_missing_creds():
+    # Credentials are unset in shell; this should result in session=None
     exchange = BreezeCCXT({})
     if exchange.breeze is None:
         print("Success: Breeze session is None (Graceful degradation)")
@@ -69,9 +74,10 @@ if __name__ == "__main__":
 EOF
 
     if python3 "$ARTIFACT_DIR/neg_check.py"; then
-        echo "P29_SKIP_MISSING_CREDS"
+        echo "P29_NEG_EXPECTED_SKIP_MISSING_CREDS"
+        echo "[OK] Observed expected skip behavior."
     else
-        echo "[FAIL] Neg Mode did not skip as expected."
+        echo "[FAIL] Neg Mode did not skip as expected despite unset credentials."
         finish_gate 1
     fi
 
@@ -86,6 +92,7 @@ ex.fetch_ticker = lambda s, p=None: {"symbol": s, "last": 2500.0}
 ex.fetch_order_book("RELIANCE/INR", 1)
 ' 2>/dev/null; then
         echo "P29_NEG_ORDERBOOK_BLOCK"
+        echo "[OK] Orderbook correctly blocked on invalid configuration."
     else
         echo "[FAIL] Orderbook did not block on invalid spread"
         finish_gate 1

@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import os
 import random
 import tempfile
@@ -572,7 +573,10 @@ class BreezeCCXT(ccxt.Exchange):
 
         # Configurable spread and qty
         try:
-            spread_bps = float(os.environ.get("FT_SYNTH_OB_SPREAD_BPS", "5"))
+            spread_bps_str = os.environ.get("FT_SYNTH_OB_SPREAD_BPS", "5")
+            spread_bps = float(spread_bps_str)
+            if not math.isfinite(spread_bps):
+                raise ValueError("Non-finite spread")
         except ValueError:
             # P29 requirement: deterministic failure if invalid
             raise OperationalException("Invalid FT_SYNTH_OB_SPREAD_BPS") from None
