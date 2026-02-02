@@ -20,7 +20,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     
     # 1. Generate UI Config
     $PYTHON scripts/make_config_ui.py \
-        --in-path "$IN_CONFIG" \
+        --in "$IN_CONFIG" \
         --out "$OUT_CONFIG" \
         --ip 127.0.0.1 --port 8081 --verbosity info
     

@@ -70,7 +70,7 @@ def persist_auth(username, password, auth_file: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Create UI-ready Freqtrade config.")
-    parser.add_argument("--in-path", dest="in_path", required=True, help="Input config JSON")
+    parser.add_argument("--in", dest="in_path", required=True, help="Input config JSON")
     parser.add_argument("--out", dest="out_path", required=True, help="Output config JSON")
     parser.add_argument("--ip", default="127.0.0.1", help="API listen IP")
     parser.add_argument("--port", type=int, default=8080, help="API listen port")
