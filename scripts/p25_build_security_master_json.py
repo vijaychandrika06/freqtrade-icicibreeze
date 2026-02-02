@@ -31,18 +31,16 @@ def build(cash_path: str, fno_path: str, output_path: str):
     fno_path = Path(fno_path)
     final_output = Path(output_path)
 
-    if not nse_path.exists():
-        # P25 Hardening requirement: exit 2 if input missing
-        print(f"ERROR: Input file not found: {nse_path}")
-        sys.exit(2)
-
     if not fno_path.exists():
-        print(f"ERROR: Input file not found: {fno_path}")
+        print(f"ERROR: REQUIRED Input file not found: {fno_path}")
         sys.exit(2)
 
-    # Load Data
-    logger.info(f"Parsing NSE Cash Master from {nse_path}...")
-    nse_data = load_nse_cash_master(str(nse_path))
+    nse_data = {"by_symbol": {}}
+    if nse_path.exists():
+        logger.info(f"Parsing NSE Cash Master from {nse_path}...")
+        nse_data = load_nse_cash_master(str(nse_path))
+    else:
+        logger.warning(f"NSE Cash Master not found at {nse_path}; skipping cash symbols.")
 
     logger.info(f"Parsing NFO Options Master from {fno_path}...")
     fno_data = load_nfo_options_master(str(fno_path))

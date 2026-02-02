@@ -24,6 +24,8 @@ mkdir -p "$CACHE_DIR"
 
 if [ "$GATE_MODE" == "pos" ]; then
     # Positive Case checks
+    rm -rf "$CACHE_DIR"
+    mkdir -p "$CACHE_DIR"
     
     # 1. Fetch (Mock or Real)
     if [[ "${BREEZE_MOCK:-0}" == "1" ]]; then
@@ -34,14 +36,25 @@ if [ "$GATE_MODE" == "pos" ]; then
         cp "user_data/data/icicibreeze/FONSEScripMaster.txt" "$CACHE_DIR/"
     else
         echo "1. Checking Connectivity..."
-        if ! curl --head --fail --connect-timeout 3 "https://scriptmaster.icicidirect.com/Content/File/txt/NSEScripMaster.txt" > /dev/null 2>&1; then
+        if ! curl --head --fail --connect-timeout 3 "https://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip" > /dev/null 2>&1; then
             echo "P25_SKIP_NO_NETWORK"
             echo "[INFO] Network unreachable. Skipping real fetch."
             finish_gate 0
         fi
 
-        echo "1. Fetching Master (Real Mode)..."
+        echo "1. Fetching Master (Real Mode - ZIP)..."
         $PYTHON scripts/p25_fetch_security_master.py --output "$CACHE_DIR"
+    fi
+
+    # R2: Extraction filters to only FONSEScripMaster.txt
+    echo "1.5 Verifying R2 (Only FON file)..."
+    if [ -f "$CACHE_DIR/NSEScripMaster.txt" ]; then
+        echo "[FAIL] NSE Scrip Master found but R2 mandates ONLY FONSEScripMaster.txt"
+        finish_gate 1
+    fi
+    if [ ! -f "$CACHE_DIR/FONSEScripMaster.txt" ]; then
+        echo "[FAIL] FONSEScripMaster.txt missing after fetch"
+        finish_gate 1
     fi
     
     # 2. Build
@@ -86,7 +99,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     
     # Extract stats for logging
     CASH_COUNT=$(jq '.cash | length' "$OUT_FILE")
-    OPT_COUNT=$(jq '.fno.options | length' "$OUT_FILE")
+    OPT_COUNT=$(jq '.options | length' "$OUT_FILE")
     echo "[OK] Valid counts: Cash=$CASH_COUNT, Options=$OPT_COUNT"
     
     echo "P25_POS_PASS"
