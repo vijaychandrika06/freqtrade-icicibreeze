@@ -42,6 +42,7 @@ ALL_GATES=(
     "p17_invalid_symbol"
     "p18_paper_forward_test"
     "p19_observability_audit"
+    "p20_ui_webserver_smoke"
     "p20_no_open_ports_pos"
     "p21_secrets_hygiene"
     "p22_real_mode_market_data"
@@ -93,6 +94,7 @@ done
 
 # Gates that support Negative mode
 HARDENED_GATES=(
+    "p20_ui_webserver_smoke"
     "p22_real_mode_market_data"
     "p25_security_master_refresh"
     "p26_indicator_governance"
