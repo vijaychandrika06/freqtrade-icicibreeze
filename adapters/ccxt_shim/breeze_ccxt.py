@@ -520,10 +520,12 @@ class BreezeCCXT(ccxt.Exchange):
         s_params = self._parse_symbol(symbol)
         try:
             res = self.breeze.get_quotes(**s_params)
-            if not res or res.get("status") != 200 or not res.get("Success"):
-                raise OperationalException(
-                    f"Breeze fetch_ticker failed: {res.get('Error') if res else 'Empty response from SDK'}"
-                )
+            # P35.8: SDK casing is inconsistent; check both 'status' and 'Status'
+            status_code = res.get("status") or res.get("Status")
+            if not res or status_code != 200 or not res.get("Success"):
+                # Handle specific error message from SDK
+                err_msg = res.get("Error") or "Empty response from SDK"
+                raise OperationalException(f"Breeze fetch_ticker failed: {err_msg}")
 
             data = res["Success"][0]
             ts = int(time.time() * 1000)
@@ -615,7 +617,9 @@ class BreezeCCXT(ccxt.Exchange):
             if s_params.get("right"):
                 request_params["right"] = s_params["right"]
             res = self.breeze.get_historical_data_v2(**request_params)
-            if not res or res.get("status") != 200 or not res.get("Success"):
+            # P35.8: Handle both 'status' and 'Status' for OHLCV
+            status_code = res.get("status") or res.get("Status")
+            if not res or status_code != 200 or not res.get("Success"):
                 return []
             ohlcv = []
             for row in res["Success"]:
