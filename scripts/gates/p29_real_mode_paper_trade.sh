@@ -17,7 +17,26 @@ if [ "$GATE_MODE" == "pos" ]; then
         finish_gate 0
     fi
      
-    # Only run if we didn't skip
+    # P29 Orderbook Check
+    echo ">>> Verifying Synthetic Orderbook..."
+    if python3 -c '
+import os, sys
+sys.path.append(os.getcwd())
+from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
+ex = BreezeCCXT({})
+ex.fetch_ticker = lambda s, p=None: {"symbol": s, "last": 2500.0, "bid": 2499.0, "ask": 2501.0}
+ob = ex.fetch_order_book("RELIANCE/INR", 1)
+print(f"OB: {ob}")
+assert len(ob["bids"]) > 0 and len(ob["asks"]) > 0
+assert ob["bids"][0][0] < ob["asks"][0][0]
+'; then
+        echo "P29_ORDERBOOK_OK"
+    else
+        echo "[FAIL] Synthetic Orderbook Check Failed."
+        finish_gate 1
+    fi
+
+    # Original Paper Execution Check
     if python3 scripts/p29_check_paper_execution.py; then
         echo "P29_POS_PASS"
         finish_gate 0
@@ -27,46 +46,52 @@ if [ "$GATE_MODE" == "pos" ]; then
     fi
 
 elif [ "$GATE_MODE" == "neg" ]; then
-    echo ">>> Gate P29: Negative (Missing Creds Skip)..."
+    echo ">>> Gate P29: Negative (Missing Creds / Invalid Config)..."
     
-    # Force unset creds
-    # Force unset creds
-    unset BREEZE_API_KEY
-    unset BREEZE_API_SECRET
-    unset BREEZE_SESSION_TOKEN
-    
-    # We want to verify that the system detects missing creds and (conceptually) skips
-    # or fails gracefully.
-    # The requirement says "expected: SKIP with marker P29_SKIP_MISSING_CREDS".
-    # We can write a tiny script to check init.
-    
+    # 1. Check Missing Creds
     cat <<EOF > "$ARTIFACT_DIR/neg_check.py"
 import os
 import sys
+sys.path.append(os.getcwd())
 from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 
 def check_missing_creds():
-    # Attempt init with empty config
     exchange = BreezeCCXT({})
-    
     if exchange.breeze is None:
         print("Success: Breeze session is None (Graceful degradation)")
-        sys.exit(0)
-    else:
-        print("Fail: Breeze session initialized despite missing creds!")
-        sys.exit(1)
+        return True
+    return False
 
 if __name__ == "__main__":
-    check_missing_creds()
+    if check_missing_creds():
+        sys.exit(0)
+    sys.exit(1)
 EOF
 
     if python3 "$ARTIFACT_DIR/neg_check.py"; then
         echo "P29_SKIP_MISSING_CREDS"
-        finish_gate 0
     else
         echo "[FAIL] Neg Mode did not skip as expected."
         finish_gate 1
     fi
+
+    # 2. Check Invalid Spread Block
+    echo ">>> Verifying Orderbook Block on Invalid Config..."
+    if ! FT_SYNTH_OB_SPREAD_BPS="nan" python3 -c '
+import os, sys
+sys.path.append(os.getcwd())
+from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
+ex = BreezeCCXT({})
+ex.fetch_ticker = lambda s, p=None: {"symbol": s, "last": 2500.0}
+ex.fetch_order_book("RELIANCE/INR", 1)
+' 2>/dev/null; then
+        echo "P29_NEG_ORDERBOOK_BLOCK"
+    else
+        echo "[FAIL] Orderbook did not block on invalid spread"
+        finish_gate 1
+    fi
+
+    finish_gate 0
 
 else
     echo "ERROR: Invalid mode"

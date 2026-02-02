@@ -557,19 +557,44 @@ class BreezeCCXT(ccxt.Exchange):
             raise OperationalException("Error in fetch_ticker. See debug logs for details.") from e
 
     def fetch_order_book(self, symbol: str, limit: int | None = None, params: dict | None = None):
-        """Fetch order book. In mock mode, returns a synthetic one."""
-        if self._is_mock_mode():
-            ticker = self.fetch_ticker(symbol)
-            price = ticker["last"]
-            return {
-                "symbol": symbol,
-                "bids": [[price - 0.05, 1000.0], [price - 0.10, 2000.0]],
-                "asks": [[price + 0.05, 1000.0], [price + 0.10, 2000.0]],
-                "timestamp": ticker["timestamp"],
-                "datetime": ticker["datetime"],
-                "nonce": None,
-            }
-        raise OperationalException("fetchOrderBook not supported yet in real mode.")
+        """
+        Fetch synthetic order book for real/paper mode.
+        Derives bids/asks from ticker data to provide a stable paper loop.
+        """
+        self.rate_limiter.allow("fetch_order_book")
+        ticker = self.fetch_ticker(symbol)
+
+        last = ticker.get("last")
+        if not last or last <= 0:
+            raise OperationalException(
+                f"ticker missing or invalid for {symbol}; cannot build synthetic orderbook"
+            )
+
+        # Configurable spread and qty
+        try:
+            spread_bps = float(os.environ.get("FT_SYNTH_OB_SPREAD_BPS", "5"))
+        except ValueError:
+            # P29 requirement: deterministic failure if invalid
+            raise OperationalException("Invalid FT_SYNTH_OB_SPREAD_BPS") from None
+
+        spread_factor = spread_bps / 10000.0  # e.g., 5 BPS = 0.0005
+        qty = float(os.environ.get("FT_SYNTH_OB_QTY", "1.0"))
+
+        # Use ticker bid/ask if present, otherwise calculate from last
+        bid_price = ticker.get("bid") or (last * (1 - spread_factor))
+        ask_price = ticker.get("ask") or (last * (1 + spread_factor))
+
+        ts = ticker.get("timestamp") or int(time.time() * 1000)
+
+        # Build CCXT orderbook structure
+        return {
+            "symbol": symbol,
+            "bids": [[float(bid_price), float(qty)]],
+            "asks": [[float(ask_price), float(qty)]],
+            "timestamp": ts,
+            "datetime": self.iso8601(ts),
+            "nonce": None,
+        }
 
     def fetch_ohlcv(
         self,
