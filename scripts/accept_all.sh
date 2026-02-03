@@ -69,6 +69,7 @@ ALL_GATES=(
     "p44_release_bundle"
     "p45_universe_rotation"
     "p46_universe_actionable_pairs"
+    "p46_ui_shortlist_contract"
 )
 
 # Parse flags
@@ -116,6 +117,7 @@ HARDENED_GATES=(
     "p44_release_bundle"
     "p45_universe_rotation"
     "p46_universe_actionable_pairs"
+    "p46_ui_shortlist_contract"
 )
 
 function is_hardened() {

@@ -27,6 +27,13 @@ echo "Ensuring UI assets are installed..."
 echo "Searching for actionable pairs..."
 python3 scripts/gen_actionable_universe_pairs.py --out "$OUTDIR/pairs.json"
 
+# 1.1 Export UI Shortlist (to prevent UI bloat)
+echo "Exporting UI shortlist metadata..."
+python3 scripts/ops/export_ui_shortlist.py \
+    --config_path "$OUTDIR/config_base.json" \
+    --security_master user_data/cache/security_master/latest.json \
+    --out user_data/generated/ui_shortlist.json || true
+
 # 2. Build configuration with pairs
 echo "Applying pair whitelist to configuration..."
 WHITELIST_FILE="$OUTDIR/whitelist.json"
