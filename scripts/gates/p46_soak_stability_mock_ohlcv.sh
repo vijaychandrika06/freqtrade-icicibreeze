@@ -110,6 +110,12 @@ elif [ "$GATE_MODE" == "neg" ]; then
     echo "P46_NEG_START"
     echo ">>> Negative Case: Verifying strategy guard with forced missing informative"
     
+    # Use a fresh, empty data directory to ensure no informative data is loaded
+    NEG_USERDIR="$ARTIFACT_DIR/neg_userdir"
+    mkdir -p "$NEG_USERDIR/data/icicibreeze"
+    mkdir -p "$NEG_USERDIR/strategies"
+    cp user_data/strategies/IndiaOptionsAutoStrategy.py "$NEG_USERDIR/strategies/"
+
     # We use a config where the informative underlying is NOT in the whitelist 
     # and not downloaded, but the strategy needs it.
     cat > "$MOCK_CONFIG" <<EOF
@@ -142,12 +148,19 @@ elif [ "$GATE_MODE" == "neg" ]; then
 }
 EOF
 
-    # Run dry-run
+    # Download data only for the option (informative underlying data will be missing)
+    $FREQTRADE download-data \
+        --config "$MOCK_CONFIG" \
+        --timeframe 5m \
+        --timerange 20260101-20260102 \
+        --userdir "$NEG_USERDIR" || true
+
+    # Run dry-run with fresh userdir
     timeout 60s $FREQTRADE trade \
         --config "$MOCK_CONFIG" \
         --strategy IndiaOptionsAutoStrategy \
         --db-url "$DB_URL" \
-        --userdir user_data \
+        --userdir "$NEG_USERDIR" \
         -v || true
 
     grep -q "P46_WARN_INFORMATIVE_MISSING" "$GATE_LOG" || { echo "Marker P46_WARN_INFORMATIVE_MISSING missing from logs"; finish_gate 1; }
