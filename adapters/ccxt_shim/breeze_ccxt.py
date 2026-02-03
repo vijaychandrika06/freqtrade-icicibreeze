@@ -1212,16 +1212,13 @@ class BreezeCCXT(ccxt.Exchange):
                 or (spec.underlying in {"NIFTY", "BANKNIFTY", "RELIANCE"})
                 or (spec.type in {InstrumentType.OPT, InstrumentType.FUT})
             )
-
             if is_mock_pair:
                 # Ensure we use a large enough limit if not provided
                 synth_limit = limit if limit is not None else 15000
                 new_ohlcv = synth_ohlcv(symbol, timeframe, since, synth_limit, seed)
-                logger.warning(
-                    f"P46_MOCK_SYNTH: symbol={symbol} is_mock_pair=True new_ohlcv_len={len(new_ohlcv)}"
-                )
+                logger.debug("Synthesized %d candles for %s", len(new_ohlcv), symbol)
             else:
-                logger.warning(f"P46_MOCK_SYNTH: symbol={symbol} is_mock_pair=False")
+                logger.debug("Symbol %s not eligible for mock synthesis, returning empty.", symbol)
                 new_ohlcv = []
 
             # Merge and dedupe
