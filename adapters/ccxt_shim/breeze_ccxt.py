@@ -1157,8 +1157,12 @@ class BreezeCCXT(ccxt.Exchange):
     def _get_mock_data_path(self, symbol: str, timeframe: str) -> Path:
         """Get path for mock data persistence."""
         safe_symbol = symbol.replace("/", "_").replace(":", "_")
-        # Use user_data_dir from config if available, fallback to "user_data"
-        user_data_dir = Path(self.config.get("user_data_dir", "user_data"))
+        # Use BREEZE_USER_DATA_DIR or config or fallback to "user_data"
+        base_dir = os.environ.get("BREEZE_USER_DATA_DIR")
+        if not base_dir:
+            base_dir = self.config.get("user_data_dir", "user_data")
+
+        user_data_dir = Path(base_dir)
         target_dir = user_data_dir / "data" / "icicibreeze" / "mock_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / f"{safe_symbol}-{timeframe}.json"

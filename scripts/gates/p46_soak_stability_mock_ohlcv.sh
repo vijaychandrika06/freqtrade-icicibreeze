@@ -117,6 +117,10 @@ elif [ "$GATE_MODE" == "neg" ]; then
     mkdir -p "$NEG_USERDIR/strategies"
     cp user_data/strategies/IndiaOptionsAutoStrategy.py "$NEG_USERDIR/strategies/"
 
+    # P46 Fix: Ensure mock cache is also isolated for this run
+    export BREEZE_USER_DATA_DIR="$NEG_USERDIR"
+    rm -rf "$NEG_USERDIR/data/icicibreeze/mock_cache"
+
     # Use INFY. Underlying INFY/INR is NOT in _MOCK_BASE_PRICES, so it won't be synthesized.
     # The option INFY-20260224-1500-CE/INR WILL be synthesized if present in whitelist.
     cat > "$MOCK_CONFIG" <<EOF
