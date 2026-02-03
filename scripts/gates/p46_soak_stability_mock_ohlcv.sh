@@ -111,7 +111,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
     echo ">>> Negative Case: Verifying strategy guard with forced missing informative (INFY)"
     
 
-3.02+0000000000    # Use a fresh, empty data directory to ensure no informative data is loaded
+    # Use a fresh, empty data directory to ensure no informative data is loaded
     NEG_USERDIR="$ARTIFACT_DIR/neg_userdir"
     mkdir -p "$NEG_USERDIR/data/icicibreeze"
     mkdir -p "$NEG_USERDIR/strategies"

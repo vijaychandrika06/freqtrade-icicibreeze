@@ -1157,7 +1157,9 @@ class BreezeCCXT(ccxt.Exchange):
     def _get_mock_data_path(self, symbol: str, timeframe: str) -> Path:
         """Get path for mock data persistence."""
         safe_symbol = symbol.replace("/", "_").replace(":", "_")
-        target_dir = Path("user_data") / "data" / "icicibreeze" / "mock_cache"
+        # Use user_data_dir from config if available, fallback to "user_data"
+        user_data_dir = Path(self.config.get("user_data_dir", "user_data"))
+        target_dir = user_data_dir / "data" / "icicibreeze" / "mock_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / f"{safe_symbol}-{timeframe}.json"
 
@@ -1211,9 +1213,11 @@ class BreezeCCXT(ccxt.Exchange):
                 # Ensure we use a large enough limit if not provided
                 synth_limit = limit if limit is not None else 15000
                 new_ohlcv = synth_ohlcv(symbol, timeframe, since, synth_limit, seed)
-                logger.debug("Synthesized %d candles for %s", len(new_ohlcv), symbol)
+                logger.warning(
+                    f"P46_MOCK_SYNTH: symbol={symbol} is_mock_pair=True new_ohlcv_len={len(new_ohlcv)}"
+                )
             else:
-                logger.debug("Symbol %s not eligible for mock synthesis, returning empty.", symbol)
+                logger.warning(f"P46_MOCK_SYNTH: symbol={symbol} is_mock_pair=False")
                 new_ohlcv = []
 
             # Merge and dedupe
