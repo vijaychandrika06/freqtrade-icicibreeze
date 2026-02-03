@@ -1197,11 +1197,24 @@ class BreezeCCXT(ccxt.Exchange):
             # Use seed from environment if provided
             seed = int(os.environ.get("MOCK_OHLCV_SEED", 42))
 
-            # Synthesize data
-            # Ensure we use a large enough limit if not provided
-            synth_limit = limit if limit is not None else 15000
-            new_ohlcv = synth_ohlcv(symbol, timeframe, since, synth_limit, seed)
-            logger.debug("Synthesized %d candles for %s", len(new_ohlcv), symbol)
+            # Synthesize data only if it's a recognized mock pair
+            spec = parse_pair(symbol)
+            pair_str = f"{spec.underlying}/{spec.quote}"
+            is_mock_pair = (
+                (spec.underlying == "BTC" and spec.quote == "USDT")
+                or (pair_str in self._MOCK_BASE_PRICES)
+                or (spec.underlying in {"NIFTY", "BANKNIFTY", "RELIANCE"})
+                or (spec.type in {InstrumentType.OPT, InstrumentType.FUT})
+            )
+
+            if is_mock_pair:
+                # Ensure we use a large enough limit if not provided
+                synth_limit = limit if limit is not None else 15000
+                new_ohlcv = synth_ohlcv(symbol, timeframe, since, synth_limit, seed)
+                logger.debug("Synthesized %d candles for %s", len(new_ohlcv), symbol)
+            else:
+                logger.debug("Symbol %s not eligible for mock synthesis, returning empty.", symbol)
+                new_ohlcv = []
 
             # Merge and dedupe
             full_map = {int(c[0]): c for c in stored_ohlcv}
