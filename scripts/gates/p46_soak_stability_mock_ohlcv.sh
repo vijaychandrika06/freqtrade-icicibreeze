@@ -108,7 +108,7 @@ EOF
 
 elif [ "$GATE_MODE" == "neg" ]; then
     echo "P46_NEG_START"
-    echo ">>> Negative Case: Verifying strategy guard with forced missing informative"
+    echo ">>> Negative Case: Verifying strategy guard with forced missing informative (INFY)"
     
     # Use a fresh, empty data directory to ensure no informative data is loaded
     NEG_USERDIR="$ARTIFACT_DIR/neg_userdir"
@@ -116,8 +116,8 @@ elif [ "$GATE_MODE" == "neg" ]; then
     mkdir -p "$NEG_USERDIR/strategies"
     cp user_data/strategies/IndiaOptionsAutoStrategy.py "$NEG_USERDIR/strategies/"
 
-    # We use a config where the informative underlying is NOT in the whitelist 
-    # and not downloaded, but the strategy needs it.
+    # Use INFY. Underlying INFY/INR is NOT in _MOCK_BASE_PRICES, so it won't be synthesized.
+    # The option INFY-20260224-1500-CE/INR WILL be synthesized if present in whitelist.
     cat > "$MOCK_CONFIG" <<EOF
 {
   "max_open_trades": 3,
@@ -127,7 +127,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
   "dry_run": true,
   "exchange": {
     "name": "icicibreeze",
-    "pair_whitelist": ["RELIANCE-20260224-2500-CE/INR"]
+    "pair_whitelist": ["INFY-20260224-1500-CE/INR"]
   },
   "entry_pricing": {
     "price_side": "same",
@@ -148,7 +148,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
 }
 EOF
 
-    # Download data only for the option (informative underlying data will be missing)
+    # Download data only for the option (underlying INFY/INR data will be missing)
     $FREQTRADE download-data \
         --config "$MOCK_CONFIG" \
         --timeframe 5m \
