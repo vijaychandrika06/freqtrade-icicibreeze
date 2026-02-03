@@ -70,6 +70,7 @@ ALL_GATES=(
     "p45_universe_rotation"
     "p46_universe_actionable_pairs"
     "p46_ui_shortlist_contract"
+    "p46_soak_stability_mock_ohlcv"
 )
 
 # Parse flags
@@ -118,6 +119,7 @@ HARDENED_GATES=(
     "p45_universe_rotation"
     "p46_universe_actionable_pairs"
     "p46_ui_shortlist_contract"
+    "p46_soak_stability_mock_ohlcv"
 )
 
 function is_hardened() {

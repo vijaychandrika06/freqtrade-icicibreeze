@@ -25,6 +25,9 @@ class IndiaOptionsAutoStrategy(IStrategy):
     timeframe = "5m"
     startup_candle_count = 50
 
+    # P46: Throttled warning cache
+    _last_warned: dict[tuple[str, str], datetime] = {}
+
     minimal_roi = {"0": 0.12}
     stoploss = -0.15
 
@@ -79,7 +82,8 @@ class IndiaOptionsAutoStrategy(IStrategy):
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """Merge underlying cash indicators into option dataframe."""
-        underlying_pair = self._underlying_pair(metadata.get("pair", ""))
+        pair = metadata.get("pair", "")
+        underlying_pair = self._underlying_pair(pair)
         if not underlying_pair or not self.dp:
             self._ensure_columns(
                 dataframe, ["ema_5_underlying", "ema_20_underlying", "rsi_14_underlying"]
@@ -87,6 +91,22 @@ class IndiaOptionsAutoStrategy(IStrategy):
             return dataframe
 
         informative = self.dp.get_pair_dataframe(pair=underlying_pair, timeframe=self.timeframe)
+
+        # P46 Guard: Check if informative data is effectively missing
+        if informative is None or informative.empty or "close" not in informative.columns:
+            now = datetime.now()
+            last_warn = self._last_warned.get((pair, "P46_WARN_INFORMATIVE_MISSING"))
+            if not last_warn or (now - last_warn).total_seconds() > 300:  # 5 min throttle
+                logger.warning(
+                    f"P46_WARN_INFORMATIVE_MISSING: No underlying data for {pair} (underlying={underlying_pair})"
+                )
+                self._last_warned[(pair, "P46_WARN_INFORMATIVE_MISSING")] = now
+
+            self._ensure_columns(
+                dataframe, ["ema_5_underlying", "ema_20_underlying", "rsi_14_underlying"]
+            )
+            return dataframe
+
         informative = informative.copy()
         informative["ema_5"] = ta.EMA(informative, timeperiod=5)
         informative["ema_20"] = ta.EMA(informative, timeperiod=20)

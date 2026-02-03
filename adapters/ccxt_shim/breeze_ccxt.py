@@ -356,11 +356,12 @@ class BreezeCCXT(ccxt.Exchange):
             key = (spec.underlying, spec.expiry_yyyymmdd, float(spec.strike), spec.right)
             info = nfo_master.get("by_contract", {}).get(key)
             if not info:
-                # Recovery for Mock Mode
-                if self._is_mock_mode() and (
-                    spec.underlying in {"NIFTY", "BANKNIFTY", "BTC"}
-                    or spec.underlying in self._MOCK_BASE_PRICES
-                ):
+                # Recovery for Mock Mode: P46 Refinement
+                # If syntactically valid and BREEZE_MOCK=1, bypass SecurityMaster dependency
+                if self._is_mock_mode():
+                    logger.debug(
+                        f"P46_MOCK_BYPASS: Synthesizing params for unknown option {symbol}"
+                    )
                     return {
                         "stock_code": spec.underlying,
                         "exchange_code": "NFO",
@@ -375,11 +376,11 @@ class BreezeCCXT(ccxt.Exchange):
             key = (spec.underlying, spec.expiry_yyyymmdd)
             info = nfo_master.get("by_future", {}).get(key)
             if not info:
-                # Recovery for Mock Mode
-                if self._is_mock_mode() and (
-                    spec.underlying in {"NIFTY", "BANKNIFTY", "BTC"}
-                    or spec.underlying in self._MOCK_BASE_PRICES
-                ):
+                # Recovery for Mock Mode: P46 Refinement
+                if self._is_mock_mode():
+                    logger.debug(
+                        f"P46_MOCK_BYPASS: Synthesizing params for unknown future {symbol}"
+                    )
                     return {
                         "stock_code": spec.underlying,
                         "exchange_code": "NFO",
@@ -422,6 +423,27 @@ class BreezeCCXT(ccxt.Exchange):
         key = (spec.underlying, spec.expiry_yyyymmdd, float(spec.strike), spec.right)
         info = contracts.get(key)
         if not info:
+            if self._is_mock_mode():
+                # Synthetic market for mock mode
+                return {
+                    "id": f"mock_{format_pair(spec)}",
+                    "symbol": format_pair(spec),
+                    "base": spec.underlying,
+                    "quote": "INR",
+                    "active": True,
+                    "type": "option",
+                    "spot": True,
+                    "option": True,
+                    "future": False,
+                    "margin": False,
+                    "swap": False,
+                    "expiry": spec.expiry_yyyymmdd,
+                    "strike": float(spec.strike),
+                    "right": spec.right,
+                    "lot": 1,
+                    "precision": {"amount": 1, "price": 0.05},
+                    "info": {},
+                }
             logger.warning("Option contract not found for whitelist entry: %s", format_pair(spec))
             return None
         return {
@@ -448,6 +470,25 @@ class BreezeCCXT(ccxt.Exchange):
         key = (spec.underlying, spec.expiry_yyyymmdd)
         info = futures.get(key)
         if not info:
+            if self._is_mock_mode():
+                # Synthetic market for mock mode
+                return {
+                    "id": f"mock_{format_pair(spec)}",
+                    "symbol": format_pair(spec),
+                    "base": spec.underlying,
+                    "quote": "INR",
+                    "active": True,
+                    "type": "future",
+                    "spot": True,
+                    "option": False,
+                    "future": True,
+                    "margin": False,
+                    "swap": False,
+                    "expiry": spec.expiry_yyyymmdd,
+                    "lot": 1,
+                    "precision": {"amount": 1, "price": 0.05},
+                    "info": {},
+                }
             logger.warning("Future contract not found for whitelist entry: %s", format_pair(spec))
             return None
         return {
