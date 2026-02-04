@@ -1,5 +1,6 @@
 import pytest
 import os
+import time
 from unittest import mock
 from freqtrade.exceptions import OperationalException
 from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
@@ -45,6 +46,13 @@ def test_fetch_ticker_rate_limit(rate_limited_exchange):
 def test_fetch_markets_rate_limit(rate_limited_exchange):
     # Depending on how tests run, tokens might be shared if instance persists or class state
     # Fixture creates new instance each time, which creates new RateLimiter, so fresh bucket.
+
+    # Prime the SecurityMaster cache (this takes time and would refill tokens)
+    rate_limited_exchange.fetch_markets()
+
+    # Reset RateLimiter to full capacity for the actual test
+    rate_limited_exchange.rate_limiter.tokens = rate_limited_exchange.rate_limiter.capacity
+    rate_limited_exchange.rate_limiter.last_refill = time.time()
 
     # 10 calls pass
     for i in range(10):
