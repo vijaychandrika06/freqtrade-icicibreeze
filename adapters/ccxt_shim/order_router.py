@@ -1,6 +1,7 @@
 import logging
 import math
-from typing import Any
+from typing import Any, Dict, List, Optional
+from utils.telemetry import UdpBroadcaster, PORT_ORDERS, TelemetryCounters
 
 from freqtrade.exceptions import OperationalException
 
@@ -24,6 +25,7 @@ class OrderRouter:
         self.paper_mode = False
         self.mock_mode = False
         self.live_trading_enabled = False
+        self._telemetry = UdpBroadcaster(PORT_ORDERS, "orders_risk")
 
     def resolve_lot_size(self, symbol: str) -> int:
         """
@@ -281,4 +283,11 @@ class OrderRouter:
         self.assert_buyer_only(symbol, side, position_check_callback, reduce_only)
 
         cid_log = f" [CID: {client_order_id}]" if client_order_id else ""
+
+        # Telemetry
+        TelemetryCounters.increment("orders_submitted")
+        self._telemetry.emit(
+            "order_validate", {"symbol": symbol, "side": side, "amount": amount}, level="info"
+        )
+
         logger.info(f"OrderRouter: Validated {side} {amount} {symbol} (Lot: {lot_size}){cid_log}")

@@ -19,6 +19,7 @@ from modules.regime.classifier import RegimeClassifier, RegimeOutput
 from modules.strike_selector.selector import StrikeSelector
 from adapters.news.gdelt_client import GDELTClient
 from modules.news_filter.blackout_flag import is_blackout
+from utils.telemetry import UdpBroadcaster, PORT_ENGINE, TelemetryCounters
 
 import pandas as pd
 import numpy as np
@@ -42,6 +43,8 @@ class UniversalScanner:
         self.regime_clf = RegimeClassifier()
         self.selector = StrikeSelector()
         self.news_client = GDELTClient()
+        self._telemetry = UdpBroadcaster(PORT_ENGINE, "engine")
+        self._telemetry = UdpBroadcaster(PORT_ENGINE, "engine")
 
         self.out_dir = Path("user_data/generated/p51")
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -82,6 +85,8 @@ class UniversalScanner:
 
     def run(self):
         logger.info("P51_SCAN_START")
+        self._telemetry.emit("scan_start", {"mode": "mock" if self.mock_mode else "real"})
+        self._telemetry.emit("scan_start")
 
         # 1. News Blackout
         sentiment = self.news_client.check_sentiment()
@@ -150,6 +155,26 @@ class UniversalScanner:
         # Top 3
         opportunities.sort(key=lambda x: x["score"], reverse=True)
         shortlist = opportunities[:3]
+
+        # Telemetry Summary
+        self._telemetry.emit(
+            "scan_complete",
+            {
+                "universe_total": len(universe),
+                "shortlisted": len(shortlist),
+                "opportunities_raw": len(opportunities),
+            },
+        )
+
+        # Telemetry Summary
+        self._telemetry.emit(
+            "scan_complete",
+            {
+                "universe_total": len(universe),
+                "shortlisted": len(shortlist),
+                "opportunities_raw": len(opportunities),
+            },
+        )
 
         # Output
         out_file = self.out_dir / "shortlist.json"

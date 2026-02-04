@@ -4,7 +4,9 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from utils.telemetry import UdpBroadcaster, PORT_ORDERS, TelemetryCounters
 from zoneinfo import ZoneInfo
+from utils.telemetry import UdpBroadcaster, PORT_ORDERS, TelemetryCounters
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ class RiskGuard:
             "daily_loss_sum": 0.0,
         }
         self.load_state()
+        self._telemetry = UdpBroadcaster(PORT_ORDERS, "orders_risk")
 
     def get_now_ist(self) -> datetime:
         # P15: Allow forcing time via ENV for deterministic testing
@@ -100,6 +103,11 @@ class RiskGuard:
             from adapters.ccxt_shim.alerts import trigger
 
             trigger("RISK_BLOCK", f"{msg}: {self.daily_trades_count} >= {self.max_trades_per_day}")
+
+            # Telemetry
+            TelemetryCounters.increment("risk_blocks")
+            self._telemetry.emit("risk_block", {"reason": msg}, level="warn")
+
             return True, msg
 
         # 3. Intraday Cutoff

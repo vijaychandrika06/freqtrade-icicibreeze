@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from utils.telemetry import UdpBroadcaster, PORT_BREEZE
 
 import ccxt
 import ccxt.async_support as ccxt_async
@@ -56,6 +57,12 @@ class BreezeCCXT(ccxt.Exchange):
     def __init__(self, config: dict[str, Any] | None = None):
         if config is None:
             config = {}
+
+        # Telemetry
+        self._telemetry = UdpBroadcaster(PORT_BREEZE, "breeze")
+        self._telemetry.emit(
+            "init", {"mode": "mock" if config.get("breeze_mock", False) else "real"}
+        )
 
         super().__init__(config)
         self.config = config

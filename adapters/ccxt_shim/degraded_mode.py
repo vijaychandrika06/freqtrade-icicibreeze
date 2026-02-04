@@ -2,6 +2,7 @@ import logging
 import os
 import time
 from typing import Optional
+from utils.telemetry import UdpBroadcaster, PORT_ORDERS
 from freqtrade.exceptions import OperationalException
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ class DegradedModeGuard:
             except Exception as e:
                 logger.warning(f"DegradedModeGuard: Failed to load persistence: {e}")
 
+        self._telemetry = UdpBroadcaster(PORT_ORDERS, "orders_risk")
+
     def record_failure(self, exc: Exception) -> None:
         """
         Record a network/API failure.
@@ -75,6 +78,8 @@ class DegradedModeGuard:
             from adapters.ccxt_shim.alerts import trigger
 
             trigger("DEGRADED_ENTER", f"Circuit Breaker Tripped. Last Error: {exc}")
+
+            self._telemetry.emit("degraded_enter", {"reason": str(exc)}, level="error")
 
             # P34 Persistence
             try:
