@@ -8,7 +8,7 @@ import math
 import random
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Add project root
 sys.path.insert(0, os.getcwd())
@@ -19,10 +19,16 @@ from modules.regime.classifier import RegimeClassifier, RegimeOutput
 from modules.strike_selector.selector import StrikeSelector
 from adapters.news.gdelt_client import GDELTClient
 from modules.news_filter.blackout_flag import is_blackout
+from modules.option_chain.schema import OptionChain
+import pandas_ta as ta
 from utils.telemetry import UdpBroadcaster, PORT_ENGINE, TelemetryCounters
 
 import pandas as pd
 import numpy as np
+
+# Funnel Configuration Defaults (Fallback)
+DISABLE_STAGES = []  # For debugging
+
 
 # Setup Logger
 logging.basicConfig(
@@ -82,6 +88,141 @@ class UniversalScanner:
         close = [1000 + i + random.random() * 10 for i in range(100)]
         return pd.DataFrame({"close": close}, index=dates)
 
+    def _scan_candidate(self, underlying: str) -> Optional[Dict]:
+        try:
+            # STAGE 1: Technicals (ADX)
+            # -------------------------
+            # Load OHLCV
+            df = self._fetch_ohlcv(underlying)
+            if df.empty or len(df) < 200:  # Need more data for SMAs
+                return None
+
+            # Compute ADX
+            # Ensure we have enough data (min 14+smoothing)
+            adx_min = (
+                self.config.get("universal_scanner", {}).get("stage1", {}).get("adx14_min", 20)
+            )
+
+            adx_val = 0.0  # Default
+            try:
+                adx_df = ta.adx(df["high"], df["low"], df["close"], length=14)
+                if adx_df is not None and not adx_df.empty and "ADX_14" in adx_df.columns:
+                    adx_val = adx_df.iloc[-1]["ADX_14"]
+                    if adx_val < adx_min:
+                        return None
+                else:
+                    return None
+            except Exception as e:
+                logger.warning(f"Technical Calc Failed for {underlying}: {e}")
+                return None
+
+            # STAGE 2 & 3: Regime & Direction
+            # -------------------------------
+            regime = self.regime_clf.classify(df)
+
+            # Check Direction Confidence
+            conf_min = (
+                self.config.get("universal_scanner", {})
+                .get("stage3", {})
+                .get("direction_confidence_min", 0.6)
+            )
+            if regime.confidence < conf_min:
+                return None
+
+            # Determine Direction
+            spot = df["close"].iloc[-1]
+            sma20 = df["close"].rolling(20).mean().iloc[-1]
+            sma50 = df["close"].rolling(50).mean().iloc[-1]
+
+            direction = "call"
+            if sma20 < sma50:
+                direction = "put"
+
+            # STAGE 2 (Part B): Fetch Chain & Check Liquidity
+            # ---------------------------------------------
+            expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+            chain = self.chain_provider.get_option_chain(underlying, expiry, direction)
+            if not chain:
+                return None
+
+            chain_spot = chain.spot_price if chain.spot_price else spot
+
+            # Find ATM Strike
+            rows_sorted = sorted(chain.rows, key=lambda x: abs(x.strike - chain_spot))
+            if not rows_sorted:
+                return None
+            atm_row = rows_sorted[0]
+
+            # Liquidity Checks
+            s2_cfg = self.config.get("universal_scanner", {}).get("stage2", {})
+            min_oi = s2_cfg.get("atm_total_oi_min", 500000)
+            max_spread = s2_cfg.get("atm_spread_pct_max", 5)
+
+            # Check OI
+            if atm_row.oi < min_oi:
+                return None
+
+            # Check Spread
+            spread_pct = 0.0
+            if atm_row.ltp > 0 and atm_row.bid is not None and atm_row.ask is not None:
+                spread_pct = ((atm_row.ask - atm_row.bid) / atm_row.ltp) * 100
+                if spread_pct > max_spread:
+                    return None
+
+            # STAGE 4: Strike Selection (Detailed)
+            # ------------------------------------
+            window = s2_cfg.get("atm_window_strikes", 1)
+            rows_by_strike = sorted(chain.rows, key=lambda x: x.strike)
+
+            # Find ATM index
+            best_idx = 0
+            min_dist = float("inf")
+            for i, r in enumerate(rows_by_strike):
+                dist = abs(r.strike - chain_spot)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_idx = i
+
+            start_idx = max(0, best_idx - window)
+            end_idx = min(len(rows_by_strike), best_idx + window + 1)
+            candidate_rows = rows_by_strike[start_idx:end_idx]
+
+            filtered_chain = OptionChain(
+                underlying=chain.underlying,
+                exchange_code=chain.exchange_code,
+                expiry=chain.expiry,
+                right=chain.right,
+                spot_price=chain_spot,
+                rows=candidate_rows,
+            )
+
+            strikes = self.selector.select_strikes(filtered_chain, chain_spot, regime)
+
+            # STAGE 5: Scoring
+            # ----------------
+            if len(strikes) > 0 and len(strikes) <= 2:
+                trend_score = float(adx_val) / 100.0 if "adx_val" in locals() else 0.5
+                regime_score = regime.confidence
+                liquidity_score = 1.0 - (spread_pct / 100.0) if "spread_pct" in locals() else 0.5
+                final_score = (trend_score * 0.4) + (regime_score * 0.3) + (liquidity_score * 0.3)
+
+                return {
+                    "underlying": underlying,
+                    "direction": "CE" if direction == "call" else "PE",
+                    "expiry": expiry,
+                    "strikes": strikes,
+                    "score": final_score,
+                    "reasons": [
+                        f"ADX={adx_val:.1f}",
+                        f"Regime={regime.regime}({regime.confidence:.2f})",
+                        f"Spread={spread_pct:.1f}%",
+                    ],
+                }
+        except Exception as e:
+            logger.exception(f"Error in candidate scan for {underlying}: {e}")
+            return None
+        return None
+
     def run(self):
         logger.info("P51_SCAN_START")
         self._telemetry.emit("scan_start", {"mode": "mock" if self.mock_mode else "real"})
@@ -104,50 +245,9 @@ class UniversalScanner:
 
         for underlying in universe:
             try:
-                # Regime
-                df = self._fetch_ohlcv(underlying)
-                regime = self.regime_clf.classify(df)
-
-                # Fetch Chain (Call and Put)
-                # Determine "spot" from OHLCV or chain?
-                spot = df["close"].iloc[-1] if not df.empty else 1000.0
-
-                # Heuristic: Scan both CE and PE? Or decide by Regime?
-                # Trend -> Follow trend. Range -> Iron Condor? (Wait, simple ranking: top 2 strikes).
-                # Implementation Plan: "compute direction from existing signals"
-                # If Trend: Call (if > SMA) or Put (if < SMA).
-                # If Range: Maybe skip or pick OTM?
-
-                direction = "call"  # Default
-                # Assuming RegimeOutput has trend info? It has score.
-                # Let's say we scan Call for now.
-                expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")  # Mock expiry
-
-                chain = self.chain_provider.get_option_chain(underlying, expiry, direction)
-                if not chain:
-                    continue
-
-                chain_spot = chain.spot_price if chain.spot_price else spot
-
-                # Selection
-                strikes = self.selector.select_strikes(chain, chain_spot, regime)
-
-                if len(strikes) == 2:
-                    # Score opportunity (simple sum of scores?)
-                    # Re-score to get aggregate
-                    # Dummy score
-                    score = random.random() * 10
-                    opportunities.append(
-                        {
-                            "underlying": underlying,
-                            "direction": "CE",
-                            "expiry": expiry,
-                            "strikes": strikes,
-                            "score": score,
-                            "reasons": ["Regime Confirmed"],
-                        }
-                    )
-
+                candidate = self._scan_candidate(underlying)
+                if candidate:
+                    opportunities.append(candidate)
             except Exception as e:
                 logger.exception(f"Error scanning {underlying}: {e}")
 

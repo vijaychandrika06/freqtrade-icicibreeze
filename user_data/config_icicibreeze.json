@@ -58,6 +58,56 @@
     "password": "CHANGE_THIS_PASSWORD_TO_SOMETHING_STRONG",
     "jwt_secret_key": "CHANGE_THIS_SECRET_TO_SOMETHING_STRONG_AND_RANDOM"
   },
+  "universal_scanner": {
+    "enabled": true,
+    "max_underlyings_out": 3,
+    "batch_size": 70,
+    "stages_enabled": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "stage1": {
+      "adx14_min": 20
+    },
+    "stage2": {
+      "atm_window_strikes": 1,
+      "atm_spread_pct_max": 5,
+      "atm_total_oi_min": 500000,
+      "iv_rank_max": 60
+    },
+    "stage3": {
+      "direction_confidence_min": 0.6
+    },
+    "stage4": {
+      "strike_candidates_max": 5,
+      "truth_serum_min_ratio": 0.75
+    },
+    "stage5": {
+      "score_weights": {
+        "regime": 0.3,
+        "chain": 0.3,
+        "greek": 0.2,
+        "iv": 0.1,
+        "news": 0.1
+      }
+    },
+    "universe": {
+      "stocks": [
+        "RELIANCE",
+        "HDFCBANK",
+        "INFY",
+        "TCS",
+        "ICICIBANK"
+      ],
+      "indices": [
+        "NIFTY",
+        "BANKNIFTY"
+      ]
+    }
+  },
   "ai_comments": {
     "enabled": false
   },
