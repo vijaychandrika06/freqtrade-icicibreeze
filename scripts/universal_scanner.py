@@ -145,7 +145,7 @@ class UniversalScanner:
                     )
 
             except Exception as e:
-                logger.error(f"Error scanning {underlying}: {e}")
+                logger.exception(f"Error scanning {underlying}: {e}")
 
         # Top 3
         opportunities.sort(key=lambda x: x["score"], reverse=True)
