@@ -62,7 +62,7 @@ def sync():
             f.write(resp.content)
         logger.info("Download complete.")
     except Exception as e:
-        logger.error(f"Failed to download Security Master: {e}")
+        logger.exception(f"Failed to download Security Master: {e}")
         return False
 
     logger.info("Extracting scrip masters...")
@@ -80,7 +80,7 @@ def sync():
         os.remove(ZIP_PATH)
         return True
     except Exception as e:
-        logger.error(f"Extraction failed: {e}")
+        logger.exception(f"Extraction failed: {e}")
         return False
 
 

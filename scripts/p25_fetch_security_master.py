@@ -74,7 +74,7 @@ def fetch_real(output_dir: Path):
         with zip_path.open("wb") as f:
             f.write(resp.content)
     except Exception as e:
-        logger.error(f"Failed to download Security Master: {e}")
+        logger.exception(f"Failed to download Security Master: {e}")
         return False
 
     logger.info(f"Extracting {FON_FILE} only...")
@@ -92,7 +92,7 @@ def fetch_real(output_dir: Path):
         zip_path.unlink()
         return True
     except Exception as e:
-        logger.error(f"Extraction failed: {e}")
+        logger.exception(f"Extraction failed: {e}")
         return False
 
 

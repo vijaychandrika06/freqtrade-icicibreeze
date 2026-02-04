@@ -91,7 +91,7 @@ def main():
         with Path(args.in_path).open() as f:
             config = json.load(f)
     except Exception as e:
-        logger.error(f"Failed to read input config: {e}")
+        logger.error(f"Failed to read input config: {e}", exc_info=True)
         sys.exit(1)
 
     config["api_server"] = {
@@ -109,7 +109,7 @@ def main():
         with out_path.open("w") as f:
             json.dump(config, f, indent=2)
     except Exception as e:
-        logger.error(f"Failed to write output config: {e}")
+        logger.error(f"Failed to write output config: {e}", exc_info=True)
         sys.exit(1)
 
     print(f"Wrote {args.out_path}")

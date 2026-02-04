@@ -36,7 +36,7 @@ def export(config_path: str, master_path: str, output_path: str):
             config = json.load(f)
         whitelist = config.get("exchange", {}).get("pair_whitelist", [])
     except Exception as e:
-        logger.error(f"Failed to read config {config_file}: {e}")
+        logger.exception(f"Failed to read config {config_file}: {e}")
         sys.exit(2)
 
     # Load Security Master (JSON if possible, or TXT)
@@ -51,7 +51,7 @@ def export(config_path: str, master_path: str, output_path: str):
             with master_file.open("r") as f:
                 master_data = json.load(f)
         except Exception as e:
-            logger.error(f"Failed to read master JSON {master_file}: {e}")
+            logger.exception(f"Failed to read master JSON {master_file}: {e}")
             sys.exit(2)
     else:
         # Fallback to loading TXT (assuming it's the NFO Options master for simplicity if not JSON)
