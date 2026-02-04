@@ -11,6 +11,16 @@ source scripts/gates/common.sh "$GATE_ID" "$@"
 # using Mocks.
 export BREEZE_MOCK=1
 
+
+# Sync Security Master from cache if available (P25 output)
+CACHE_MASTER="user_data/cache/security_master/FONSEScripMaster.txt"
+DATA_MASTER="user_data/data/icicibreeze/FONSEScripMaster.txt"
+
+if [ -f "$CACHE_MASTER" ]; then
+    echo "Syncing Security Master from cache for P30 verification..."
+    cp "$CACHE_MASTER" "$DATA_MASTER"
+fi
+
 if [ "$GATE_MODE" == "pos" ]; then
     echo ">>> Gate P30: Positive (Checking Double Lock Logic)..."
     if python3 scripts/p30_check_live_guard.py; then

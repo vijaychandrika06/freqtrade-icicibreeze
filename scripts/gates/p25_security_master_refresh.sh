@@ -119,7 +119,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
     # Requirement: exit code 2 (as implemented in builder hardening)
     if [ $RES -eq 2 ]; then
         echo "[OK] Builder exited with code 2 as expected."
-        if echo "$OUTPUT" | grep -q "ERROR: Input file not found"; then
+        if echo "$OUTPUT" | grep -q "ERROR: REQUIRED Input file not found"; then
              echo "[OK] Found expected error message."
              echo "P25_NEG_EXPECTED_FAIL"
              finish_gate 0

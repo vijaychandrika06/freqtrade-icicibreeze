@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 import time
-from datetime import datetime, timezone
+
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -101,8 +101,8 @@ class LiveReadiness:
         # Assuming ScripMaster is at user_data/data/icicibreeze/NSEScripMaster.txt
         # We need to find where it is configured.
         # Ideally passed in config, but we can look in default location.
-        # breeze_ccxt uses `user_data/data/icicibreeze/NSEScripMaster.txt` by default.
-        scrip_master_path = Path("user_data/data/icicibreeze/NSEScripMaster.txt")
+        # breeze_ccxt uses `user_data/data/icicibreeze/FONSEScripMaster.txt` by default.
+        scrip_master_path = Path("user_data/data/icicibreeze/FONSEScripMaster.txt")
         if scrip_master_path.exists():
             try:
                 mtime = scrip_master_path.stat().st_mtime
