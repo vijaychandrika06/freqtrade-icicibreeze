@@ -71,6 +71,12 @@ ALL_GATES=(
     "p46_universe_actionable_pairs"
     "p46_ui_shortlist_contract"
     "p46_soak_stability_mock_ohlcv"
+    "p46_option_chain_provider"
+    "p47_options_valuation"
+    "p48_regime"
+    "p49_strike_selector"
+    "p50_news_blackout"
+    "p51_universal_scanner"
 )
 
 # Parse flags
@@ -120,6 +126,12 @@ HARDENED_GATES=(
     "p46_universe_actionable_pairs"
     "p46_ui_shortlist_contract"
     "p46_soak_stability_mock_ohlcv"
+    "p46_option_chain_provider"
+    "p47_options_valuation"
+    "p48_regime"
+    "p49_strike_selector"
+    "p50_news_blackout"
+    "p51_universal_scanner"
 )
 
 function is_hardened() {
