@@ -388,11 +388,12 @@ def main() -> None:
     universe = _parse_universe_config(payload)
     option_policy = _parse_option_policy(payload)
 
-    master_path = (
-        Path(args.security_master)
+    raw_master_path = (
+        args.security_master
         if args.security_master
         else find_latest_master_file("FONSEScripMaster.txt")
     )
+    master_path = Path(raw_master_path) if raw_master_path else None
     snapshot_id = _compute_snapshot_id(master_path) if master_path else "none"
 
     security_master = _load_contracts(master_path)
