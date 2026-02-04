@@ -44,7 +44,6 @@ class UniversalScanner:
         self.selector = StrikeSelector()
         self.news_client = GDELTClient()
         self._telemetry = UdpBroadcaster(PORT_ENGINE, "engine")
-        self._telemetry = UdpBroadcaster(PORT_ENGINE, "engine")
 
         self.out_dir = Path("user_data/generated/p51")
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -155,16 +154,6 @@ class UniversalScanner:
         # Top 3
         opportunities.sort(key=lambda x: x["score"], reverse=True)
         shortlist = opportunities[:3]
-
-        # Telemetry Summary
-        self._telemetry.emit(
-            "scan_complete",
-            {
-                "universe_total": len(universe),
-                "shortlisted": len(shortlist),
-                "opportunities_raw": len(opportunities),
-            },
-        )
 
         # Telemetry Summary
         self._telemetry.emit(

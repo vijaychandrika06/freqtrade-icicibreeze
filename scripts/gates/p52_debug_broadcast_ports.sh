@@ -73,7 +73,11 @@ with open('$CAPTURE_FILE', 'w') as f:
     fi
     
     # We ignore exit code of scanner as we just want telemetry side effects
-    python3 scripts/universal_scanner.py --config config_p52.json --mock > user_data/generated/p52/scanner.log 2>&1 || true
+    python3 scripts/universal_scanner.py --config config_p52.json > user_data/generated/p52/scanner.log 2>&1 || true
+
+    # Run Breeze Trigger (Scanner might not init CCXT)
+    echo "Triggering Breeze/Risk Telemetry..."
+    python3 -c "import sys; sys.path.append('.'); from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT; print('Initing Breeze...'); BreezeCCXT({'breeze_mock': True, 'risk_guard': {'enabled': True}})" > user_data/generated/p52/trigger.log 2>&1 || true
 
     # Wait for Capture
     sleep 2
@@ -123,7 +127,7 @@ if [ "$GATE_MODE" == "neg" ]; then
     fi
     
     echo "Running Stress Test without Listener..."
-    if python3 scripts/universal_scanner.py --config config_p52.json --mock > /dev/null 2>&1; then
+    if python3 scripts/universal_scanner.py --config config_p52.json > /dev/null 2>&1; then
          echo "[OK] Bot did not crash without listener."
     else
          echo "[FAIL] Bot crashed!"
