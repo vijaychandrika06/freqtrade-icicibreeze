@@ -1,8 +1,10 @@
-import pytest
 import os
 import time
 from unittest import mock
+
+import pytest
 from freqtrade.exceptions import OperationalException
+
 from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 
 
@@ -72,7 +74,8 @@ def test_create_order_rate_limit(rate_limited_exchange):
     with mock.patch("adapters.ccxt_shim.market_hours.MarketHoursGuard.assert_can_create_order"):
         # P15 risk check calls fetch_ticker, which consumes a token.
         # We mock fetch_ticker to avoid double consumption and isolate create_order check.
-        # We need to mock it on the INSTANCE, not the class, because the instance RateLimiter is what we rely on?
+        # We need to mock it on the INSTANCE, not the class,
+        # because the instance RateLimiter is what we rely on?
         # Use mock.patch.object
         with mock.patch.object(
             rate_limited_exchange,
