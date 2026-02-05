@@ -11,7 +11,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from utils.telemetry import UdpBroadcaster, PORT_BREEZE
+from adapters.telemetry.udp_bus import UdpTelemetryBus
+from adapters.telemetry.schema import PORT_BREEZE, Layer, Severity
 
 import ccxt
 import ccxt.async_support as ccxt_async
@@ -59,10 +60,17 @@ class BreezeCCXT(ccxt.Exchange):
             config = {}
 
         # Telemetry
-        self._telemetry = UdpBroadcaster(PORT_BREEZE, "breeze")
-        self._telemetry.emit(
-            "init", {"mode": "mock" if config.get("breeze_mock", False) else "real"}
-        )
+        self._telemetry = UdpTelemetryBus(PORT_BREEZE, Layer.BREEZE, config.get("run_id"))
+
+        # F2: Fail Fast for Credentials (Real Mode)
+        mock = config.get("breeze_mock", False)
+        if not mock:
+            key = config.get("exchange", {}).get("key", "")
+            secret = config.get("exchange", {}).get("secret", "")
+            if not key or not secret:
+                raise OperationalException("BreezeCCXT: Missing API Key/Secret for Real Mode.")
+
+        self._telemetry.emit("init", {"mode": "mock" if mock else "real"}, severity=Severity.INFO)
 
         super().__init__(config)
         self.config = config
@@ -744,6 +752,12 @@ class BreezeCCXT(ccxt.Exchange):
         self, symbol, order_type, side, amount, price=None, params: dict | None = None
     ):
         logger.info(f"BreezeCCXT.create_order (Sync) called for {symbol} {side}")
+
+        self._telemetry.emit(
+            "order_attempt",
+            {"symbol": symbol, "side": side, "type": order_type, "amount": amount, "price": price},
+            level="1",
+        )
         try:
             self._check_fault_inject("create_order_fail")
             self.rate_limiter.allow("create_order")
@@ -1044,6 +1058,7 @@ class BreezeCCXT(ccxt.Exchange):
             raise OperationalException(f"Paper Execution Error: {e}")
 
     def cancel_order(self, order_id, symbol=None, params: dict | None = None):
+        self._telemetry.emit("order_cancel_attempt", {"id": order_id, "symbol": symbol}, level="1")
         if self.paper_mode:
             logger.warning(
                 f"Paper mode cancel_order called for {order_id}. "
@@ -1071,9 +1086,9 @@ class BreezeCCXT(ccxt.Exchange):
 
     def edit_order(
         self,
-        order_id: str,
+        id: str,
         symbol: str,
-        order_type: str,
+        type: str,  # F1: CCXT param name compliance
         side: str,
         amount: float | None = None,
         price: float | None = None,
@@ -1084,19 +1099,29 @@ class BreezeCCXT(ccxt.Exchange):
         Since native modify is not fully supported/trusted yet, we use Cancel/Replace.
         Enforces OrderRouter modification policies.
         """
+        order_type = type  # Alias
+
         if params is None:
             params = {}
 
-        logger.info(f"BreezeCCXT.edit_order called for {order_id} {symbol}")
+        logger.info(f"BreezeCCXT.edit_order called for {id} {symbol}")
+
+        self._telemetry.emit(
+            "order_modify_attempt", {"id": id, "symbol": symbol, "type": order_type}, level="1"
+        )
+
+        # F3: Guard Enforcement
+        self.market_hours.assert_can_edit_order(id, str(symbol))
 
         # 1. Enforce Router Checks (Quota & Ladder)
-        self.order_router.track_and_assert_modify(order_id, time.time())
+        # Note: id vs order_id in router? router expects order_id
+        self.order_router.track_and_assert_modify(id, time.time())
 
         # 2. Execute Cancel/Replace
         # Note: In a real implementation with native modify, we would call it here.
         # Fallback to Cancel + Create
-        logger.info(f"edit_order: Cancelling {order_id} to replace...")
-        self.cancel_order(order_id, symbol)
+        logger.info(f"edit_order: Cancelling {id} to replace...")
+        self.cancel_order(id, symbol)
 
         # Wait a bit? Or assume atomic enough?
         # Create new order behaves as a new entry/exit.

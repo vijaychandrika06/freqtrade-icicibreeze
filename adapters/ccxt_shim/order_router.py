@@ -1,7 +1,8 @@
 import logging
 import math
 from typing import Any, Dict, List, Optional
-from utils.telemetry import UdpBroadcaster, PORT_ORDERS, TelemetryCounters
+from adapters.telemetry.udp_bus import UdpTelemetryBus
+from adapters.telemetry.schema import PORT_ORDERS, Layer, Severity, TelemetryLevel
 
 from freqtrade.exceptions import OperationalException
 
@@ -25,7 +26,7 @@ class OrderRouter:
         self.paper_mode = False
         self.mock_mode = False
         self.live_trading_enabled = False
-        self._telemetry = UdpBroadcaster(PORT_ORDERS, "orders_risk")
+        self._telemetry = UdpTelemetryBus(PORT_ORDERS, Layer.ORDERS)
 
     def resolve_lot_size(self, symbol: str) -> int:
         """
@@ -66,9 +67,9 @@ class OrderRouter:
         if not math.isclose(remainder, 0, abs_tol=1e-5) and not math.isclose(
             remainder, lot_size, abs_tol=1e-5
         ):
-            raise OperationalException(
-                f"order_router_block:lot_size (Amount {amount} not multiple of {lot_size})"
-            )
+            msg = f"order_router_block:lot_size (Amount {amount} not multiple of {lot_size})"
+            self._telemetry.emit("order_blocked", {"reason": msg}, level="1")
+            raise OperationalException(msg)
 
     def assert_buyer_only(
         self,
@@ -94,9 +95,9 @@ class OrderRouter:
 
         if position_check_callback is None:
             # Fail safe: Block if we can't check positions
-            raise OperationalException(
-                "order_router_block:buyer_only (Sell blocked, no position check available)"
-            )
+            msg = "order_router_block:buyer_only (Sell blocked, no position check available)"
+            self._telemetry.emit("order_blocked", {"reason": msg}, level="1")
+            raise OperationalException(msg)
 
         # Check if we have an open position for this symbol
         # position_check_callback should return True if Long Position exists
@@ -285,7 +286,7 @@ class OrderRouter:
         cid_log = f" [CID: {client_order_id}]" if client_order_id else ""
 
         # Telemetry
-        TelemetryCounters.increment("orders_submitted")
+        # TelemetryCounters.increment("orders_submitted")
         self._telemetry.emit(
             "order_validate", {"symbol": symbol, "side": side, "amount": amount}, level="info"
         )

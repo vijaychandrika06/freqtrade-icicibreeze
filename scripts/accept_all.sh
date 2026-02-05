@@ -79,6 +79,7 @@ ALL_GATES=(
     "p51_universal_scanner"
     "p52_debug_broadcast_ports"
     "p52_universal_funnel"
+    "p53_telemetry_smoke"
 )
 
 # Parse flags
@@ -136,6 +137,7 @@ HARDENED_GATES=(
     "p51_universal_scanner"
     "p52_debug_broadcast_ports"
     "p52_universal_funnel"
+    "p53_telemetry_smoke"
 )
 
 function is_hardened() {

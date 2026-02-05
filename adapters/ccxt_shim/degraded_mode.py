@@ -4,6 +4,7 @@ import time
 from typing import Optional
 from utils.telemetry import UdpBroadcaster, PORT_ORDERS
 from freqtrade.exceptions import OperationalException
+from adapters.time.clock import get_clock
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class DegradedModeGuard:
                 cb = state.get("circuit_breaker", {})
                 if cb.get("tripped"):
                     tripped_at = cb.get("tripped_at", 0)
-                    now = time.time()
+                    now = get_clock().now_utc().timestamp()
                     # Check if still valid (using failure_window or separate cooldown)
                     # For now, using failure_window logic (if it was recent enough to still be relevant?)
                     # Actually, if it tripped, it should stay tripped until explicitly reset or timeout.
@@ -56,7 +57,7 @@ class DegradedModeGuard:
         """
         Record a network/API failure.
         """
-        now = time.time()
+        now = get_clock().now_utc().timestamp()
         # Reset if outside window
         if now - self.last_failure_ts > self.failure_window:
             self.failures = 0

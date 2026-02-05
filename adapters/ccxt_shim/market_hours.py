@@ -15,6 +15,8 @@ from freqtrade.exceptions import OperationalException
 
 logger = logging.getLogger(__name__)
 
+from adapters.time.clock import get_clock
+
 # NSE Market Hours (IST)
 MARKET_OPEN = time(9, 15)
 MARKET_CLOSE = time(15, 30)
@@ -57,26 +59,12 @@ class MarketHoursGuard:
             return False
 
         if now is None:
-            # Check for deterministic time injection (Mock/Backtest)
-            injected_time = os.environ.get("FT_IST_NOW")
-            if injected_time:
-                try:
-                    now = datetime.fromisoformat(injected_time)
-                except ValueError:
-                    logger.warning(
-                        f"Invalid FT_IST_NOW format: {injected_time}. Using system time."
-                    )
-                    now = datetime.now(timezone.utc)
-            else:
-                now = datetime.now(timezone.utc)
-
-        # Ensure we are in IST
-        if now.tzinfo is None:
-            # Assume UTC if naive
-            now = now.replace(tzinfo=timezone.utc)
-
-        # Convert to IST
-        now_ist = now.astimezone(IST_OFFSET)
+            now_ist = get_clock().now_ist()
+        else:
+            # Ensure we are in IST if a specific time was passed
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=timezone.utc)
+            now_ist = now.astimezone(IST_OFFSET)
 
         # 1. Check Weekend (Mon=0, Sun=6)
         # 5=Sat, 6=Sun

@@ -22,6 +22,7 @@ def force_market_open():
 
 MOCK_CONFIG = {
     "dry_run": True,
+    "breeze_mock": True,
     "options": {"mode": "mock"},
     "risk_guard": {"enabled": False},
     "icicibreeze": {"live_trading": {"enabled": True}},
@@ -132,3 +133,50 @@ def test_fetch_unknown_order_raises_clear_error():
     exchange = BreezeCCXT(MOCK_CONFIG)
     with pytest.raises(OperationalException, match="Mock order unknown_id not found"):
         exchange.fetch_order("unknown_id")
+
+
+def test_edit_order_signature_compliance():
+    """Verify edit_order accepts CCXT 'type' param and updates order."""
+    exchange = BreezeCCXT(MOCK_CONFIG)
+    symbol = "RELIANCE/INR"
+
+    # Create original
+    order = exchange.create_order(symbol, "limit", "buy", 10.0, 2500.0)
+    oid = order["id"]
+
+    # Edit using 'type' kwarg (F1 fix verification)
+    # This ensures no signature shadow error occurs
+    new_order = exchange.edit_order(id=oid, symbol=symbol, type="market", side="buy", amount=5.0)
+
+    assert new_order["id"] != oid  # Replaced
+    assert new_order["type"] == "market"
+    assert new_order["amount"] == 5.0
+
+    # Verify original cancelled
+    old_order = exchange.fetch_order(oid)
+    assert old_order["status"] == "canceled"
+
+
+def test_market_hours_block_deterministic():
+    """Verify entries blocked outside NSE hours using deterministic clock."""
+    # 2026-02-05 02:30:00 UTC = 08:00 IST (CLOSED)
+    closed_time = "2026-02-05T02:30:00+00:00"
+
+    # We must UNSET the force override from fixture to test logic
+    with mock.patch.dict(os.environ, {"FT_IST_NOW": closed_time, "FT_FORCE_MARKET_OPEN": "0"}):
+        exchange = BreezeCCXT(MOCK_CONFIG)
+        symbol = "RELIANCE/INR"
+
+        # BUY should fail
+        with pytest.raises(OperationalException, match="market_hours_block"):
+            exchange.create_order(symbol, "limit", "buy", 1.0, 2500.0)
+
+        # SELL should pass (Exits Allowed)
+        # Note: OrderRouter might block if no position, but MarketHours allows.
+        # Check specific error to know WHICH guard blocked it.
+        try:
+            exchange.create_order(symbol, "limit", "sell", 1.0, 2500.0)
+        except OperationalException as e:
+            # Should NOT be market_hours_block
+            # Might be buyer_only or lot_size or mock success
+            assert "market_hours_block" not in str(e)
