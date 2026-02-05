@@ -64,6 +64,7 @@ ALL_GATES=(
     "p39_ops_hardening"
     "p40_live_readiness"
     "p40_live_readiness_path_consistency"
+    "p40_live_readiness_path_consistency"
     "p41_deadman_auto_renew"
     "p42_incident_response"
     "p43_restart_reconcile"
@@ -81,6 +82,7 @@ ALL_GATES=(
     "p52_debug_broadcast_ports"
     "p52_universal_funnel"
     "p53_telemetry_smoke"
+    "p54_balance_contract"
 )
 
 # Parse flags
@@ -122,6 +124,7 @@ HARDENED_GATES=(
     "p35_ops_runbook"
     "p38_soak_stability"
     "p40_live_readiness"
+    "p40_live_readiness_path_consistency"
     "p41_deadman_auto_renew"
     "p42_incident_response"
     "p43_restart_reconcile"
@@ -139,6 +142,7 @@ HARDENED_GATES=(
     "p52_debug_broadcast_ports"
     "p52_universal_funnel"
     "p53_telemetry_smoke"
+    "p54_balance_contract"
 )
 
 function is_hardened() {
