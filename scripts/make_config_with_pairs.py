@@ -55,7 +55,31 @@ def main() -> None:
         logger.error("Base config is missing exchange configuration.")
         raise SystemExit(1)
 
-    exchange["pair_whitelist"] = pairs
+    # Hygiene Check (R4)
+    valid_pairs = []
+    dropped_pairs = []
+
+    for p in pairs:
+        if not p.endswith("/INR"):
+            dropped_pairs.append(p)
+            continue
+
+        # Explicit Index Spot Rejection (R3)
+        # NIFTY/INR, BANKNIFTY/INR are not tradable
+        if p in ["NIFTY/INR", "BANKNIFTY/INR", "FINNIFTY/INR"]:
+            dropped_pairs.append(p)
+            continue
+
+        valid_pairs.append(p)
+
+    if dropped_pairs:
+        logger.warning(
+            f"Dropped {len(dropped_pairs)} invalid pairs (Hygiene Rule): {dropped_pairs}"
+        )
+
+    # If shortlist empty (valid_pairs empty), whitelist becomes empty list.
+    # This prevents stale carry-over.
+    exchange["pair_whitelist"] = valid_pairs
     config["exchange"] = exchange
     _write_json(out_path, config)
 

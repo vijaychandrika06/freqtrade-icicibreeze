@@ -48,21 +48,57 @@ if [ "$GATE_MODE" == "pos" ]; then
          finish_gate 1
     fi
     
+    echo "4. Verifying Pair Config Generation & Hygiene..."
+    PAIRS_FILE="user_data/generated/p51/pairs.json"
+    if [ ! -f "$PAIRS_FILE" ]; then
+         echo "[FAIL] pairs.json missing"
+         finish_gate 1
+    fi
+    
+    # Run make_config
+    GEN_CONFIG="user_data/generated/p52_temp_config.json"
+    $PYTHON scripts/make_config_with_pairs.py --base user_data/config_icicibreeze.json --pairs "$PAIRS_FILE" --out "$GEN_CONFIG" || finish_gate 1
+    
+    # Check Hygiene
+    if grep -q "NIFTY/INR" "$GEN_CONFIG"; then
+         echo "[FAIL] Found NIFTY/INR in generated config (Index Hygiene Fail)"
+         finish_gate 1
+    fi
+    if grep -q "BTC/USDT" "$GEN_CONFIG"; then
+         echo "[FAIL] Found BTC/USDT in generated config (Hygiene Fail)"
+         finish_gate 1
+    fi
+    
+    echo "[OK] Config generated without invalid pairs"
+    
     echo ">>> Gate P52: SUCCESS"
     finish_gate 0
 
 elif [ "$GATE_MODE" == "neg" ]; then
-    # Negative Case: Check behavior with empty universe/bad data?
-    # For now, just a placeholder or ensure it doesn't crash on bad config (handled by scanner defaults).
-    # Step 1: Run with invalid config path (should fail gracefully or exit 1)
-    echo "1. Testing Invalid Config..."
-    if $PYTHON scripts/universal_scanner.py --config invalid.json > /dev/null 2>&1; then
-        echo "[FAIL] Should have failed with invalid config"
-        finish_gate 1
-    else
-        echo "[OK] Failed expectedly"
-    fi
+    # Negative Case: Hygiene Rejection
+    echo "1. Testing Hygiene Rejection in MakeConfig..."
+    DIRTY_PAIRS="user_data/generated/p52_dirty.json"
+    echo '["BTC/USDT", "ETH/USD", "RELIANCE/INR", "NIFTY/INR"]' > "$DIRTY_PAIRS"
+    DIRTY_OUT="user_data/generated/p52_dirty_config.json"
     
+    $PYTHON scripts/make_config_with_pairs.py --base user_data/config_icicibreeze.json --pairs "$DIRTY_PAIRS" --out "$DIRTY_OUT" || finish_gate 1
+    
+    # Verification
+    if grep -q "BTC/USDT" "$DIRTY_OUT"; then
+         echo "[FAIL] BTC/USDT was NOT dropped"
+         finish_gate 1
+    fi
+    if grep -q "NIFTY/INR" "$DIRTY_OUT"; then
+         echo "[FAIL] NIFTY/INR was NOT dropped"
+         finish_gate 1
+    fi
+    if grep -q "RELIANCE/INR" "$DIRTY_OUT"; then
+         echo "[OK] RELIANCE/INR preserved"
+    else
+         echo "[FAIL] RELIANCE/INR lost"
+         finish_gate 1
+    fi
+
     echo ">>> Gate P52: SUCCESS (Neg)"
     finish_gate 0
 

@@ -30,6 +30,11 @@ from modules.universal_funnel.config import (
     CALIBRATED_DEFAULTS,
     RejectStage,
 )
+from adapters.ccxt_shim.instrument import (
+    InstrumentSpec,
+    InstrumentType as ShimInstrumentType,
+    format_pair,
+)
 from modules.universal_funnel.funnel import evaluate as funnel_evaluate
 
 import pandas as pd
@@ -63,6 +68,7 @@ class UniversalScanner:
         self.out_dir = Path("user_data/generated/p51")
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.stage_counts = {}
+        self.full_report_log = []  # List of all processed candidates with details
 
     def _load_config(self) -> Dict:
         with self.config_path.open("r") as f:
@@ -162,9 +168,35 @@ class UniversalScanner:
             # 6. Evaluate
             result = funnel_evaluate(f_input, funnel_cfg)
 
-            # 7. Collect Metrics (Implicitly done by caller aggregating results? No, we need counters)
-            # We can log here.
+            # 7. Collect Metrics
             self.stage_counts["processed"] = self.stage_counts.get("processed", 0) + 1
+            metric_snapshot = {
+                "atr_pct": 0.0,  # Placeholder, would need to extract from funnel debug or calc here if needed
+                "liquidity_value": 0.0,
+                "atm_total_volume": 0.0,
+            }
+            # Extract metrics from debug if available
+            if "atr_pct" in result.debug:
+                metric_snapshot["atr_pct"] = result.debug["atr_pct"]
+            if "liquidity" in result.debug:
+                metric_snapshot["liquidity_value"] = result.debug["liquidity"]
+
+            # Record decision
+            decision = "accept" if result.passed else "reject"
+            reject_reason = result.reject_reason if not result.passed else ""
+
+            self.full_report_log.append(
+                {
+                    "underlying": underlying,
+                    "instrument_type": itype.value,
+                    "stage_reached": result.reject_stage.value if not result.passed else "complete",
+                    "decision": decision,
+                    "reject_reason": reject_reason,
+                    "score": result.score,
+                    "metrics": metric_snapshot,
+                }
+            )
+
             if not result.passed:
                 rej = result.reject_stage.value
                 self.stage_counts[f"{rej}_reject"] = self.stage_counts.get(f"{rej}_reject", 0) + 1
@@ -181,6 +213,7 @@ class UniversalScanner:
                 "score": result.score,
                 "reasons": [f"Score={result.score:.2f}", "Funnel Pass"],
                 "funnel_debug": result.debug,
+                "instrument_type": itype.value,
             }
 
         except Exception as e:
@@ -247,10 +280,38 @@ class UniversalScanner:
                     "index": str(CALIBRATED_DEFAULTS[InstrumentType.INDEX]),
                 },
                 "items": shortlist,
+                "full_log": self.full_report_log,
             }
             json.dump(report_data, f, indent=2)
+            json.dump(report_data, f, indent=2)
+
+        # Output Pairs List (Tradable Instruments)
+        pairs_file = self.out_dir / "pairs.json"
+        tradable_pairs = []
+        for item in shortlist:
+            # item has: underlying, direction (CE/PE), expiry (YYYY-MM-DD), strikes (List[float])
+            # Normalize expiry
+            exp_str = item["expiry"].replace("-", "")
+
+            for strike in item["strikes"]:
+                try:
+                    spec = InstrumentSpec(
+                        type=ShimInstrumentType.OPT,
+                        underlying=item["underlying"],
+                        expiry_yyyymmdd=exp_str,
+                        strike=float(strike),
+                        right=item["direction"],
+                    )
+                    pair = format_pair(spec)
+                    tradable_pairs.append(pair)
+                except Exception as e:
+                    logger.warning(f"Failed to format pair for {item['underlying']}: {e}")
+
+        with pairs_file.open("w") as f:
+            json.dump(tradable_pairs, f, indent=2)
 
         logger.info(f"P51_SHORTLIST_WRITTEN: {len(shortlist)} items")
+        logger.info(f"P52_PAIRS_WRITTEN: {len(tradable_pairs)} pairs")
         logger.info(f"P52_STAGE_COUNTS: {json.dumps(self.stage_counts)}")
         if len(shortlist) > 0:
             logger.info("P51_SHORTLIST_SIZE_OK")
