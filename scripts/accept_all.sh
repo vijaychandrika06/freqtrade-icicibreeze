@@ -78,6 +78,7 @@ ALL_GATES=(
     "p50_news_blackout"
     "p51_universal_scanner"
     "p52_debug_broadcast_ports"
+    "p52_universal_funnel"
 )
 
 # Parse flags
@@ -134,6 +135,7 @@ HARDENED_GATES=(
     "p50_news_blackout"
     "p51_universal_scanner"
     "p52_debug_broadcast_ports"
+    "p52_universal_funnel"
 )
 
 function is_hardened() {
