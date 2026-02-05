@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,12 @@ HEALTH_FILE = Path("user_data/generated/runtime/health.json")
 class HealthSnapshot:
     _instance = None
 
-    def __init__(self):
+    def __init__(self, now_fn: Callable[[], datetime] | None = None):
+        if now_fn:
+            self._now_dt = now_fn
+        else:
+            self._now_dt = lambda: datetime.now(timezone.utc)
+
         self._counters = {"policy_blocks": 0, "degraded_failures": 0}
         self._last_calls = {
             "fetch_ticker_utc": None,
@@ -51,7 +57,7 @@ class HealthSnapshot:
         key = f"{method_name}_utc"
         # Update timestamp if key exists (whitelist of tracked methods)
         if key in self._last_calls:
-            self._last_calls[key] = datetime.now(timezone.utc).isoformat()
+            self._last_calls[key] = self._now_dt().isoformat()
 
             # Update duration if provided and tracked
             if duration_ms is not None and method_name in self._durations:
@@ -91,7 +97,7 @@ class HealthSnapshot:
     def persist(self):
         data = {
             "meta": {
-                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "generated_at_utc": self._now_dt().isoformat(),
                 "commit": os.environ.get("GIT_COMMIT", "unknown"),
             },
             "runtime": {"mode": self._mode},

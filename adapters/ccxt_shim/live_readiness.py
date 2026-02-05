@@ -14,6 +14,13 @@ MIN_DISK_FREE_GB = 2
 SEC_MASTER_MAX_AGE_SEC = 86400  # 24 hours
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 class LiveReadiness:
     @staticmethod
     def check_deadman() -> dict:
@@ -66,7 +73,8 @@ class LiveReadiness:
         )
         if not icici_config.get("session_token") and not os.environ.get("BREEZE_SESSION_TOKEN"):
             # In mock mode this might be allowed, so check mock flag
-            if not os.environ.get("BREEZE_MOCK"):
+            # In mock mode this might be allowed, so check mock flag
+            if not _env_bool("BREEZE_MOCK"):
                 return {
                     "ok": False,
                     "code": "TOKEN_MISSING",
@@ -98,24 +106,32 @@ class LiveReadiness:
             }
 
         # 3. Security Master Freshness
-        # Assuming ScripMaster is at user_data/data/icicibreeze/NSEScripMaster.txt
-        # We need to find where it is configured.
-        # Ideally passed in config, but we can look in default location.
-        # breeze_ccxt uses `user_data/data/icicibreeze/FONSEScripMaster.txt` by default.
-        scrip_master_path = Path("user_data/data/icicibreeze/FONSEScripMaster.txt")
-        if scrip_master_path.exists():
-            try:
-                mtime = scrip_master_path.stat().st_mtime
-                age = time.time() - mtime
-                if age > SEC_MASTER_MAX_AGE_SEC:
-                    return {
-                        "ok": False,
-                        "code": "SEC_MASTER_STALE",
-                        "reason": f"Security Master stale (age={age:.0f}s > {SEC_MASTER_MAX_AGE_SEC}s)",
-                        "details": {"age": age},
-                    }
-            except Exception:
-                pass  # Ignore stat errors, file existence is good enough for basic check if we cant stat
+        from adapters.ccxt_shim.security_master import find_latest_master_file
+
+        master_path_str = find_latest_master_file("FONSEScripMaster.txt")
+        if not master_path_str:
+            return {
+                "ok": False,
+                "code": "SEC_MASTER_MISSING",
+                "reason": "Security Master file not found in search paths",
+                "details": {},
+            }
+
+        scrip_master_path = Path(master_path_str)
+        try:
+            mtime = scrip_master_path.stat().st_mtime
+            age = time.time() - mtime
+            # P2 Determinism: env var for max age? Defaults to SEC_MASTER_MAX_AGE_SEC constant.
+            # Plan requested constant or env-configured. Let's stick to constant for now as per code.
+            if age > SEC_MASTER_MAX_AGE_SEC:
+                return {
+                    "ok": False,
+                    "code": "SEC_MASTER_STALE",
+                    "reason": f"Security Master stale (age={age:.0f}s > {SEC_MASTER_MAX_AGE_SEC}s)",
+                    "details": {"age": age},
+                }
+        except Exception:
+            pass
 
         # 4. Pair Whitelist (from config)
         whitelist = config.get("exchange", {}).get("pair_whitelist", [])

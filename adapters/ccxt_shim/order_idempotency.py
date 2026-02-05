@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,9 @@ CACHE_TTL_SEC = 86400  # 24 hours
 
 
 class OrderIdempotency:
-    def __init__(self):
+    def __init__(self, now_fn: Callable[[], float] = time.time):
         self._cache = {}  # {client_order_id: timestamp_sec}
+        self._now = now_fn
         self._ensure_dir()
         self.load()
 
@@ -45,7 +46,7 @@ class OrderIdempotency:
             logger.error(f"Failed to persist idempotency cache: {e}")
 
     def _cleanup(self):
-        now = time.time()
+        now = self._now()
         initial_count = len(self._cache)
         # Remove old entries
         self._cache = {k: v for k, v in self._cache.items() if now - v < CACHE_TTL_SEC}
@@ -102,5 +103,5 @@ class OrderIdempotency:
         """
         Register a successfully submitted ID.
         """
-        self._cache[client_order_id] = time.time()
+        self._cache[client_order_id] = self._now()
         self.persist()
