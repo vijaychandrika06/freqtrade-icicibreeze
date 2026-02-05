@@ -22,6 +22,15 @@ from modules.news_filter.blackout_flag import is_blackout
 from modules.option_chain.schema import OptionChain
 import pandas_ta as ta
 from utils.telemetry import UdpBroadcaster, PORT_ENGINE, TelemetryCounters
+from modules.universal_funnel.config import (
+    FunnelInput,
+    FunnelConfig,
+    InstrumentType,
+    Direction as FunnelDirection,
+    CALIBRATED_DEFAULTS,
+    RejectStage,
+)
+from modules.universal_funnel.funnel import evaluate as funnel_evaluate
 
 import pandas as pd
 import numpy as np
@@ -53,6 +62,7 @@ class UniversalScanner:
 
         self.out_dir = Path("user_data/generated/p51")
         self.out_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_counts = {}
 
     def _load_config(self) -> Dict:
         with self.config_path.open("r") as f:
@@ -90,138 +100,92 @@ class UniversalScanner:
 
     def _scan_candidate(self, underlying: str) -> Optional[Dict]:
         try:
-            # STAGE 1: Technicals (ADX)
-            # -------------------------
-            # Load OHLCV
+            # 1. Determine Instrument Type & Config
+            # Heuristic: Hardcoded indices for now, else Stock
+            indices = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
+            itype = InstrumentType.INDEX if underlying in indices else InstrumentType.STOCK
+            funnel_cfg = CALIBRATED_DEFAULTS[itype]
+
+            # 2. Fetch Data (OHLCV)
+            # This is Stage 2 prereq but we need it for input
             df = self._fetch_ohlcv(underlying)
-            if df.empty or len(df) < 200:  # Need more data for SMAs
-                return None
 
-            # Compute ADX
-            # Ensure we have enough data (min 14+smoothing)
-            adx_min = (
-                self.config.get("universal_scanner", {}).get("stage1", {}).get("adx14_min", 20)
-            )
-
-            adx_val = 0.0  # Default
-            try:
-                adx_df = ta.adx(df["high"], df["low"], df["close"], length=14)
-                if adx_df is not None and not adx_df.empty and "ADX_14" in adx_df.columns:
-                    adx_val = adx_df.iloc[-1]["ADX_14"]
-                    if adx_val < adx_min:
-                        return None
-                else:
-                    return None
-            except Exception as e:
-                logger.warning(f"Technical Calc Failed for {underlying}: {e}")
-                return None
-
-            # STAGE 2 & 3: Regime & Direction
-            # -------------------------------
+            # 3. Regime & Direction (Stage 3/4 prereq)
             regime = self.regime_clf.classify(df)
 
-            # Check Direction Confidence
-            conf_min = (
-                self.config.get("universal_scanner", {})
-                .get("stage3", {})
-                .get("direction_confidence_min", 0.6)
-            )
-            if regime.confidence < conf_min:
-                return None
+            # Map Regime to Direction Signal
+            # Simple logic: Trend -> Call/Put based on SMAs
+            # If regime is unknown/range, maybe NONE?
+            # Config might say "skip if range" but funnel logic handles rejects.
+            # We need to pass a signal.
 
-            # Determine Direction
-            spot = df["close"].iloc[-1]
-            sma20 = df["close"].rolling(20).mean().iloc[-1]
-            sma50 = df["close"].rolling(50).mean().iloc[-1]
+            direction_signal = FunnelDirection.NONE
+            if not df.empty and len(df) > 50:
+                sma20 = df["close"].rolling(20).mean().iloc[-1]
+                sma50 = df["close"].rolling(50).mean().iloc[-1]
+                if sma20 > sma50:
+                    direction_signal = FunnelDirection.CE
+                else:
+                    direction_signal = FunnelDirection.PE
 
-            direction = "call"
-            if sma20 < sma50:
-                direction = "put"
+            # 4. Fetch Chain (Stage 3 prereq)
+            # We fetch based on direction? Funnel needs chain to check liquidity.
+            # Provider requires direction.
+            # If NONE, we can't fetch specific direction efficiently?
+            # Or we fetch both? The plan says "Chain Fast Kill" uses ATM volume.
+            # Let's fetch the direction we think it is, or default to CE if NONE (and funnel will reject anyway).
 
-            # STAGE 2 (Part B): Fetch Chain & Check Liquidity
-            # ---------------------------------------------
+            fetch_dir = "call" if direction_signal == FunnelDirection.CE else "put"
             expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-            chain = self.chain_provider.get_option_chain(underlying, expiry, direction)
-            if not chain:
-                return None
+            chain = self.chain_provider.get_option_chain(underlying, expiry, fetch_dir)
 
-            chain_spot = chain.spot_price if chain.spot_price else spot
+            # Convert Chain to Snapshot Dict
+            chain_snapshot = {}
+            if chain:
+                chain_snapshot = {
+                    "expiry": chain.expiry,
+                    "rows": chain.rows,  # Pass objects directly, funnel handles it
+                    "spot_price": chain.spot_price,
+                }
 
-            # Find ATM Strike
-            rows_sorted = sorted(chain.rows, key=lambda x: abs(x.strike - chain_spot))
-            if not rows_sorted:
-                return None
-            atm_row = rows_sorted[0]
-
-            # Liquidity Checks
-            s2_cfg = self.config.get("universal_scanner", {}).get("stage2", {})
-            min_oi = s2_cfg.get("atm_total_oi_min", 500000)
-            max_spread = s2_cfg.get("atm_spread_pct_max", 5)
-
-            # Check OI
-            if atm_row.oi < min_oi:
-                return None
-
-            # Check Spread
-            spread_pct = 0.0
-            if atm_row.ltp > 0 and atm_row.bid is not None and atm_row.ask is not None:
-                spread_pct = ((atm_row.ask - atm_row.bid) / atm_row.ltp) * 100
-                if spread_pct > max_spread:
-                    return None
-
-            # STAGE 4: Strike Selection (Detailed)
-            # ------------------------------------
-            window = s2_cfg.get("atm_window_strikes", 1)
-            rows_by_strike = sorted(chain.rows, key=lambda x: x.strike)
-
-            # Find ATM index
-            best_idx = 0
-            min_dist = float("inf")
-            for i, r in enumerate(rows_by_strike):
-                dist = abs(r.strike - chain_spot)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_idx = i
-
-            start_idx = max(0, best_idx - window)
-            end_idx = min(len(rows_by_strike), best_idx + window + 1)
-            candidate_rows = rows_by_strike[start_idx:end_idx]
-
-            filtered_chain = OptionChain(
-                underlying=chain.underlying,
-                exchange_code=chain.exchange_code,
-                expiry=chain.expiry,
-                right=chain.right,
-                spot_price=chain_spot,
-                rows=candidate_rows,
+            # 5. Construct Input
+            f_input = FunnelInput(
+                underlying=underlying,
+                instrument_type=itype,
+                ohlcv_5m=df,
+                option_chain_snapshot=chain_snapshot,
+                direction_signal=direction_signal,
+                regime=regime.regime,  # RegimeOutput.regime is str
+                news_blackout_flag=False,  # Passed from main loop if needed, hardcode false in individual scan for now or check client
             )
 
-            strikes = self.selector.select_strikes(filtered_chain, chain_spot, regime)
+            # 6. Evaluate
+            result = funnel_evaluate(f_input, funnel_cfg)
 
-            # STAGE 5: Scoring
-            # ----------------
-            if len(strikes) > 0 and len(strikes) <= 2:
-                trend_score = float(adx_val) / 100.0 if "adx_val" in locals() else 0.5
-                regime_score = regime.confidence
-                liquidity_score = 1.0 - (spread_pct / 100.0) if "spread_pct" in locals() else 0.5
-                final_score = (trend_score * 0.4) + (regime_score * 0.3) + (liquidity_score * 0.3)
+            # 7. Collect Metrics (Implicitly done by caller aggregating results? No, we need counters)
+            # We can log here.
+            self.stage_counts["processed"] = self.stage_counts.get("processed", 0) + 1
+            if not result.passed:
+                rej = result.reject_stage.value
+                self.stage_counts[f"{rej}_reject"] = self.stage_counts.get(f"{rej}_reject", 0) + 1
+                return None
 
-                return {
-                    "underlying": underlying,
-                    "direction": "CE" if direction == "call" else "PE",
-                    "expiry": expiry,
-                    "strikes": strikes,
-                    "score": final_score,
-                    "reasons": [
-                        f"ADX={adx_val:.1f}",
-                        f"Regime={regime.regime}({regime.confidence:.2f})",
-                        f"Spread={spread_pct:.1f}%",
-                    ],
-                }
+            self.stage_counts["shortlisted"] = self.stage_counts.get("shortlisted", 0) + 1
+
+            # 8. Return Candidate Dict (Legacy Format for compatibility)
+            return {
+                "underlying": underlying,
+                "direction": result.selected_direction.value,
+                "expiry": result.selected_expiry,
+                "strikes": result.selected_strikes,
+                "score": result.score,
+                "reasons": [f"Score={result.score:.2f}", "Funnel Pass"],
+                "funnel_debug": result.debug,
+            }
+
         except Exception as e:
             logger.exception(f"Error in candidate scan for {underlying}: {e}")
             return None
-        return None
 
     def run(self):
         logger.info("P51_SCAN_START")
@@ -265,12 +229,29 @@ class UniversalScanner:
             },
         )
 
-        # Output
+        logger.info(f"Scan Stages: {self.stage_counts}")
+
+        # Output Shortlist
         out_file = self.out_dir / "shortlist.json"
         with out_file.open("w") as f:
             json.dump({"run_id": datetime.now().isoformat(), "items": shortlist}, f, indent=2)
 
+        # Output P52 Report (Detailed)
+        report_file = self.out_dir / "shortlist_report.json"
+        with report_file.open("w") as f:
+            report_data = {
+                "run_id": datetime.now().isoformat(),
+                "metrics": self.stage_counts,
+                "config_used": {
+                    "stock": str(CALIBRATED_DEFAULTS[InstrumentType.STOCK]),
+                    "index": str(CALIBRATED_DEFAULTS[InstrumentType.INDEX]),
+                },
+                "items": shortlist,
+            }
+            json.dump(report_data, f, indent=2)
+
         logger.info(f"P51_SHORTLIST_WRITTEN: {len(shortlist)} items")
+        logger.info(f"P52_STAGE_COUNTS: {json.dumps(self.stage_counts)}")
         if len(shortlist) > 0:
             logger.info("P51_SHORTLIST_SIZE_OK")
 
