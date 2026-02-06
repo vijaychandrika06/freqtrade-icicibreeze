@@ -82,6 +82,16 @@ class BreezeOptionChainProvider(OptionChainProvider):
         return chain
 
     def _generate_mock_chain(self, underlying: str, expiry: str, right: str) -> OptionChain:
+        if underlying == "FAIL":
+            return OptionChain(
+                underlying=underlying,
+                exchange_code="NFO",
+                expiry=expiry,
+                right=right,
+                spot_price=0.0,
+                rows=[],
+            )
+
         # Deterministic mock based on underlying name hash
         seed = sum(ord(c) for c in underlying)
         spot = 1000.0 + (seed % 100) * 10  # Arbitrary spot

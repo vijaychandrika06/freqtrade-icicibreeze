@@ -11,8 +11,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from adapters.telemetry.udp_bus import UdpTelemetryBus
-from adapters.telemetry.schema import PORT_BREEZE, Layer, Severity
+from adapters.ops.circuit_breaker import CircuitBreakerGuard
+from adapters.telemetry.schema import Layer, Severity
+from adapters.telemetry.udp_bus import PORT_BREEZE, UdpTelemetryBus
+from adapters.time.clock import get_clock
 
 import ccxt
 import ccxt.async_support as ccxt_async
@@ -198,7 +200,7 @@ class BreezeCCXT(ccxt.Exchange):
                         "low": f"{base_price * 0.99:.2f}",
                         "best_bid_price": f"{base_price - 0.05:.2f}",
                         "best_ask_price": f"{base_price + 0.05:.2f}",
-                        "ltt": datetime.now().strftime("%d-%b-%Y %H:%M:%S"),
+                        "ltt": get_clock().now_ist().strftime("%d-%b-%Y %H:%M:%S"),
                     }
                 ],
             }

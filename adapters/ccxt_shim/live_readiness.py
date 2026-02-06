@@ -5,6 +5,8 @@ import time
 
 from pathlib import Path
 
+from adapters.time.clock import Clock, get_clock
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -23,13 +25,15 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 class LiveReadiness:
     @staticmethod
-    def check_deadman() -> dict:
+    def check_deadman(clock: "Clock | None" = None) -> dict:
         """
         Verifies the deadman switch file exists and is fresh.
         """
         # If in mock mode, deadman check might be relaxed by caller, but strictly speaking
         # for P40 we want fail-closed unless specifically bypassed.
         # We'll implement strict fail-closed here.
+
+        clock = clock or get_clock()
 
         if not DEADMAN_FILE.exists():
             return {
@@ -41,7 +45,7 @@ class LiveReadiness:
         try:
             stat = DEADMAN_FILE.stat()
             mtime = stat.st_mtime
-            now = time.time()
+            now = clock.now_utc().timestamp()
             age = now - mtime
 
             if age > DEADMAN_MAX_AGE_SEC:
@@ -62,10 +66,12 @@ class LiveReadiness:
             }
 
     @staticmethod
-    def check_readiness(config: dict) -> dict:
+    def check_readiness(config: dict, clock: "Clock | None" = None) -> dict:
         """
         Comprehensive readiness check for live trading.
         """
+        clock = clock or get_clock()
+
         # 1. Config Check (Session Token)
         # Note: BREEZE_MOCK env might be handled outside, but checking config consistency here.
         icici_config = config.get("icicibreeze") or config.get("exchange", {}).get(
@@ -120,7 +126,7 @@ class LiveReadiness:
         scrip_master_path = Path(master_path_str)
         try:
             mtime = scrip_master_path.stat().st_mtime
-            age = time.time() - mtime
+            age = clock.now_utc().timestamp() - mtime
             # P2 Determinism: env var for max age? Defaults to SEC_MASTER_MAX_AGE_SEC constant.
             # Plan requested constant or env-configured. Let's stick to constant for now as per code.
             if age > SEC_MASTER_MAX_AGE_SEC:

@@ -35,6 +35,9 @@ from adapters.ccxt_shim.instrument import (
     InstrumentType as ShimInstrumentType,
     format_pair,
 )
+    format_pair,
+)
+from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 from modules.universal_funnel.funnel import evaluate as funnel_evaluate
 
 import pandas as pd
@@ -60,6 +63,8 @@ class UniversalScanner:
             api_key=self.config.get("exchange", {}).get("key", ""),
             api_secret=self.config.get("exchange", {}).get("secret", ""),
         )
+        # P55: Use BreezeCCXT for OHLCV
+        self.exchange = BreezeCCXT(self.config)
         self.regime_clf = RegimeClassifier()
         self.selector = StrikeSelector()
         self.news_client = GDELTClient()
@@ -88,21 +93,23 @@ class UniversalScanner:
             close = [1000 + i + random.random() * 10 for i in range(100)]
             return pd.DataFrame({"close": close}, index=dates)
 
-        # Real Mode: Fetch from Breeze or cache?
-        # Prompt says IO only in adapters.
-        # For P51, we assume we might leverage freqtrade's data or simple fetch.
-        # But "strategy remains pure logic".
-        # I'll just return empty/mock for now in "real" because I lack a configured OHLCV provider adapter here
-        # unless I reuse BreezeCCXT logic which is heavy.
-        # Given "BREEZE_MOCK=1 deterministic (no SecurityMaster dependency)", and real mode limitation...
-        # I'll assume mock for now or implement basic fetch later if needed.
-        # Check P48 gate: it uses synthetic data.
-        logger.warning(
-            f"Real OHLCV fetch not implemented in scanner yet, using synthetic fallback for {underlying}"
-        )
-        dates = pd.date_range(end=datetime.now(), periods=100, freq="D")
-        close = [1000 + i + random.random() * 10 for i in range(100)]
-        return pd.DataFrame({"close": close}, index=dates)
+        # Real Mode: Fetch from BreezeCCXT
+        symbol = f"{underlying}/INR"  # Assumption: BreezeCCXT handles NIFTY/INR correctly for indices if mapped
+        try:
+             # fetch_ohlcv returns list of [ts, o, h, l, c, v]
+             ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe="1d", limit=100)
+             if not ohlcv:
+                 logger.warning(f"Empty OHLCV for {symbol}")
+                 return pd.DataFrame()
+             
+             # Convert to DataFrame
+             df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+             df.set_index("timestamp", inplace=True)
+             return df
+        except Exception as e:
+             logger.error(f"Failed to fetch real OHLCV for {symbol}: {e}")
+             return pd.DataFrame()
 
     def _scan_candidate(self, underlying: str) -> Optional[Dict]:
         try:

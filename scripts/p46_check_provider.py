@@ -35,18 +35,22 @@ def main():
             sys.exit(1)
 
     else:
-        # Test negative case? Mock provider returns data for "any" underlying currently.
-        # To test negative in mock, we might need a specific trigger or just verify API handling.
-        # For now, let's verify cache writing or specific artifact existence?
-        # The prompt neg marker is `P46_EXPECTED_EMPTY_OK`.
-        # I'll simulate a failure case if possible, or just skip if mock is too robust.
-        # Let's say we pass specific "EMPTY" underlying to mock generator (I need to update provider to support this if I want real neg test)
-        # OR I can just simulate the logic branch.
+        # P55: Negative Test validating failure handling
+        logger.info("Simulating negative case with underlying='FAIL'...")
 
-        logger.info("Simulating negative case (empty/failure)...")
-        # In mock, let's just assert we handle it gracefully if we force None.
-        # Actually I didn't verify handling of failed Breeze init in non-mock.
-        # I'll stick to basic flow check.
+        # We expect a valid OptionChain object but with 0 rows
+        chain = provider.get_option_chain("FAIL", "2026-02-26", "call")
+
+        if chain is None:
+            # This is also acceptable if provider returns None on partial fail,
+            # but mock implementation returns object with rows=[]
+            logger.info("Provider returned None (acceptable failure).")
+        elif len(chain.rows) == 0:
+            logger.info("Provider returned empty chain (expected).")
+        else:
+            logger.error(f"Expected empty/failure, got {len(chain.rows)} rows")
+            sys.exit(1)
+
         logger.info("P46_EXPECTED_EMPTY_OK")
         logger.info("P46_PASS")
 

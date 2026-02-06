@@ -37,8 +37,13 @@ try:
 
         setattr(ccxt, "icicibreeze", icicibreeze)
 
-except Exception:
-    pass
+except Exception as e:
+    # Use print/logging to ensure visibility of shim failure during boot
+    # We use logger since it's defined below, but we must ensure it exists.
+    # common.py initializes logger at line 48. We are at line 40.
+    # Safety: just print to stderr if logger not ready, or define logger earlier.
+    # Actually, let's defer logger usage or just use print for this critical boot error.
+    print(f"CRITICAL: Failed to register ICICI Breeze CCXT shim: {e}")
 # --- end shim ---
 
 from freqtrade.exceptions import DDosProtection, RetryableOrderError, TemporaryError

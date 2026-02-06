@@ -36,8 +36,6 @@ def patch_ccxt():
         ccxt_pro.icicibreeze = BreezeAsyncCCXT
 
 
-patch_ccxt()
-
 # --- Freqtrade Exchange Class ---
 
 
@@ -56,6 +54,9 @@ class Icicibreeze(Exchange):
     def _init_ccxt(
         self, exchange_config: dict[str, Any], sync: bool, ccxt_kwargs: dict[str, Any]
     ) -> Any:
+        # Patch CCXT locally to ensure shim availability
+        patch_ccxt()
+
         # Determine Mode: Default to real if key/secret exists, else stub
         # P35.6 Check both 'key'/'secret' (Freqtrade) and 'apiKey'/'secret' (CCXT standard)
         config_key = exchange_config.get("key") or exchange_config.get("apiKey")
