@@ -227,8 +227,11 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _include_cash_pair(option_policy: OptionPolicy, is_index: bool) -> bool:
+    # P57: Indices are not tradable, so never include cash pair in whitelist
+    if is_index:
+        return False
     if option_policy.include_cash_pair is None:
-        return is_index
+        return False
     return option_policy.include_cash_pair
 
 

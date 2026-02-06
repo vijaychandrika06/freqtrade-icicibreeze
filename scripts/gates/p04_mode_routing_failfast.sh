@@ -15,7 +15,8 @@ if [ "$GATE_MODE" == "pos" ]; then
     unset BREEZE_API_KEY BREEZE_API_SECRET BREEZE_SESSION_TOKEN
     
     # Create keyless config
-    cat user_data/config_icicibreeze.json | jq 'del(.exchange.key, .exchange.secret, .icicibreeze.icici_mode)' > user_data/config_nokeys.json
+    # P57 Fix: Remove icici_mode from exchange config too
+    cat user_data/config_icicibreeze.json | jq 'del(.exchange.key, .exchange.secret, .exchange.icici_mode, .icicibreeze.icici_mode)' > user_data/config_nokeys.json
     
     freqtrade list-markets -c user_data/config_nokeys.json --userdir user_data > "$LOG_FILE" 2>&1 || true
 

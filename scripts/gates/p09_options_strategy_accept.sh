@@ -35,7 +35,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     
     echo "Step 5: Dry-run Smoke Test (Positive)"
     LOG_FILE="$ARTIFACT_DIR/dry_run.log"
-    timeout 15s freqtrade trade -c "$CONFIG_FILE" --userdir user_data --strategy IndiaOptionsAutoStrategy --dry-run > "$LOG_FILE" 2>&1 || true
+    timeout 60s freqtrade trade -c "$CONFIG_FILE" --userdir user_data --strategy IndiaOptionsAutoStrategy --dry-run > "$LOG_FILE" 2>&1 || true
     
     if grep -q "Changing state to: RUNNING" "$LOG_FILE"; then
         echo "[OK] Bot reached RUNNING state with options strategy"

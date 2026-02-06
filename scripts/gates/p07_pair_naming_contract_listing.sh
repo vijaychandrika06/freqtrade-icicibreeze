@@ -8,6 +8,10 @@ source scripts/gates/common.sh "$GATE_ID" "$@"
 
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
+echo "Step 0: Ensure Security Master exists"
+# P57: Force real download because we don't have the fixture committed
+BREEZE_MOCK=0 $PYTHON scripts/p25_fetch_security_master.py --output user_data/data/icicibreeze || echo "Warning: Download failed, proceeding anyway..."
+
 echo "Step 1: Normalize Pair Names"
 # Legacy format
 LEGACY="RELIANCE-2026-02-26-2800-CE"

@@ -7,7 +7,7 @@ from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 
 @pytest.fixture
 def exchange_for_resilience():
-    exchange = BreezeCCXT()
+    exchange = BreezeCCXT(config={"breeze_mock": True})
     exchange.breeze = mock.Mock()  # Mock session
     return exchange
 
