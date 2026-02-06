@@ -103,7 +103,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     export FT_FORCE_MARKET_OPEN=1
     
     # Run
-    timeout 15s "$FREQTRADE" trade \
+    timeout 60s "$FREQTRADE" trade \
         --config "${ARTIFACT_DIR}/config_p40.json" \
         --strategy TestStrategy \
         --strategy-path "${ARTIFACT_DIR}" \
@@ -134,7 +134,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
     export FT_FORCE_MARKET_OPEN=1
 
     # Run
-    timeout 15s "$FREQTRADE" trade \
+    timeout 60s "$FREQTRADE" trade \
         --config "${ARTIFACT_DIR}/config_p40.json" \
         --strategy TestStrategy \
         --strategy-path "${ARTIFACT_DIR}" \

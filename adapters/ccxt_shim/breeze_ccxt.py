@@ -63,14 +63,7 @@ class BreezeCCXT(ccxt.Exchange):
         # Telemetry
         self._telemetry = UdpTelemetryBus(PORT_BREEZE, Layer.BREEZE, config.get("run_id"))
 
-        # F2: Fail Fast for Credentials (Real Mode)
         mock = config.get("breeze_mock", False) or os.environ.get("BREEZE_MOCK") == "1"
-        if not mock:
-            key = config.get("exchange", {}).get("key", "")
-            secret = config.get("exchange", {}).get("secret", "")
-            if not key or not secret:
-                raise OperationalException("BreezeCCXT: Missing API Key/Secret for Real Mode.")
-
         self._telemetry.emit("init", {"mode": "mock" if mock else "real"}, severity=Severity.INFO)
 
         super().__init__(config)

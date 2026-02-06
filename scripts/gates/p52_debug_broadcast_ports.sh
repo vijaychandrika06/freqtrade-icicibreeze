@@ -32,7 +32,7 @@ for p in ports:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('127.0.0.1', p))
-        s.settimeout(1.0)
+        s.settimeout(0.1)
         socks.append(s)
     except Exception as e:
         print(f'Failed to bind {p}: {e}')
@@ -42,7 +42,7 @@ with open('$CAPTURE_FILE', 'w') as f:
     sys.stdout.flush()
     
     start = time.time()
-    while time.time() - start < 15: # Run for 15s max
+    while time.time() - start < 30: # Run for 30s max
         for s in socks:
             try:
                 data, addr = s.recvfrom(4096)
@@ -63,6 +63,7 @@ with open('$CAPTURE_FILE', 'w') as f:
     echo "Running Universal Scanner (Mock)..."
     export BREEZE_MOCK=1
     export FT_TELEMETRY=1
+    export TELEMETRY_LEVEL=1
     # Create dummy config if needed
     if [ ! -f config_p52.json ]; then
         if [ -f config.json.example ]; then

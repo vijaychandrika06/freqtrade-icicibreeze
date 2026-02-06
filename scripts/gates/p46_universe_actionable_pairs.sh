@@ -10,10 +10,18 @@ source scripts/gates/common.sh "$GATE_ID" "$@"
 PAIRS_JSON="$ARTIFACT_DIR/pairs.json"
 export BREEZE_MOCK=1
 
+# Locate SecurityMaster (Must be FO Master, used in both POS and NEG)
+MASTER_FILE=$(find user_data/data/icicibreeze user_data/cache/security_master -name "FONSEScripMaster.txt" 2>/dev/null | head -n 1)
+if [ -z "$MASTER_FILE" ]; then
+    echo "[ERROR] SecurityMaster file not found!"
+    finish_gate 1
+fi
+echo "Using SecurityMaster: $MASTER_FILE"
+
 if [ "$GATE_MODE" == "pos" ]; then
     echo ">>> Positive Case: Verifying actionable universe generation"
     
-    $PYTHON scripts/gen_actionable_universe_pairs.py --out "$PAIRS_JSON"
+    $PYTHON scripts/gen_actionable_universe_pairs.py --security-master "$MASTER_FILE" --out "$PAIRS_JSON"
     
     # 1. Assert markers
     grep -q "P46_POS_PASS" "$GATE_LOG" || { echo "Marker P46_POS_PASS missing"; finish_gate 1; }
@@ -43,6 +51,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
     
     # Request 10 strikes, expect clamp to 2
     $PYTHON scripts/gen_actionable_universe_pairs.py \
+        --security-master "$MASTER_FILE" \
         --out "$PAIRS_JSON" \
         --strikes-per-underlying 10
         

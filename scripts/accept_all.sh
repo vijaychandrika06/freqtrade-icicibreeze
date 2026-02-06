@@ -64,7 +64,6 @@ ALL_GATES=(
     "p39_ops_hardening"
     "p40_live_readiness"
     "p40_live_readiness_path_consistency"
-    "p40_live_readiness_path_consistency"
     "p41_deadman_auto_renew"
     "p42_incident_response"
     "p43_restart_reconcile"
