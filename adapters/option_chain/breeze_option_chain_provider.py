@@ -13,9 +13,19 @@ from modules.option_chain.schema import OptionChain, OptionChainRow
 logger = logging.getLogger("breeze_chain_provider")
 
 
+from adapters.time.clock import Clock, get_clock
+
+
 class BreezeOptionChainProvider(OptionChainProvider):
-    def __init__(self, api_key: str = "", api_secret: str = "", session_token: str = ""):
+    def __init__(
+        self,
+        api_key: str = "",
+        api_secret: str = "",
+        session_token: str = "",
+        clock: "Clock | None" = None,
+    ):
         self.mock_mode = os.environ.get("BREEZE_MOCK", "0") == "1"
+        self.clock = clock or get_clock()
         self.cache_dir = Path("user_data/cache/option_chain")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_ttl = 60  # seconds
@@ -40,7 +50,7 @@ class BreezeOptionChainProvider(OptionChainProvider):
             try:
                 data = json.loads(cache_file.read_text())
                 ts = data.get("timestamp_ts", 0)
-                if datetime.now().timestamp() - ts < self.cache_ttl:
+                if self.clock.now_utc().timestamp() - ts < self.cache_ttl:
                     return self._deserialize(data)
             except Exception:
                 pass
@@ -122,7 +132,7 @@ class BreezeOptionChainProvider(OptionChainProvider):
                     volume=1000,
                     oi=5000,
                     d_oi=100,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=self.clock.now_utc().isoformat(),
                 )
             )
 
@@ -196,7 +206,7 @@ class BreezeOptionChainProvider(OptionChainProvider):
                 }
                 for r in chain.rows
             ],
-            "timestamp_ts": datetime.now().timestamp(),
+            "timestamp_ts": self.clock.now_utc().timestamp(),
         }
         path.write_text(json.dumps(data, indent=2))
 

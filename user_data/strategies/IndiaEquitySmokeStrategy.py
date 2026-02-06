@@ -15,7 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class IndiaEquitySmokeStrategy(IStrategy):
-    """Simple deterministic strategy used for plumbing validation."""
+    """
+    Simple deterministic strategy used for plumbing validation.
+
+    NOTE: This strategy is intentionally NOT FreqAI-enabled.
+    It relies on standard Technical Analysis (TA) indicators for smoke testing.
+    For FreqAI, use a dedicated strategy inheriting from IStrategy and implementing
+    freqai_feature_engineering_* methods.
+    """
 
     INTERFACE_VERSION = 3
 

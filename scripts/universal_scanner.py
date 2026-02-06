@@ -35,8 +35,6 @@ from adapters.ccxt_shim.instrument import (
     InstrumentType as ShimInstrumentType,
     format_pair,
 )
-    format_pair,
-)
 from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 from modules.universal_funnel.funnel import evaluate as funnel_evaluate
 
@@ -96,20 +94,22 @@ class UniversalScanner:
         # Real Mode: Fetch from BreezeCCXT
         symbol = f"{underlying}/INR"  # Assumption: BreezeCCXT handles NIFTY/INR correctly for indices if mapped
         try:
-             # fetch_ohlcv returns list of [ts, o, h, l, c, v]
-             ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe="1d", limit=100)
-             if not ohlcv:
-                 logger.warning(f"Empty OHLCV for {symbol}")
-                 return pd.DataFrame()
-             
-             # Convert to DataFrame
-             df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
-             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-             df.set_index("timestamp", inplace=True)
-             return df
+            # fetch_ohlcv returns list of [ts, o, h, l, c, v]
+            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe="1d", limit=100)
+            if not ohlcv:
+                logger.warning(f"Empty OHLCV for {symbol}")
+                return pd.DataFrame()
+
+            # Convert to DataFrame
+            df = pd.DataFrame(
+                ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
+            )
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            df.set_index("timestamp", inplace=True)
+            return df
         except Exception as e:
-             logger.error(f"Failed to fetch real OHLCV for {symbol}: {e}")
-             return pd.DataFrame()
+            logger.error(f"Failed to fetch real OHLCV for {symbol}: {e}")
+            return pd.DataFrame()
 
     def _scan_candidate(self, underlying: str) -> Optional[Dict]:
         try:

@@ -12,8 +12,11 @@ try:
     if "icicibreeze" not in getattr(ccxt, "exchanges", []):
         ccxt.exchanges.append("icicibreeze")
 
-    if not hasattr(ccxt, "icicibreeze"):
-
+    # RP-003: existing registration check
+    # If it's already registered AND it looks like our real shim (has our custom method), skip.
+    current_shim = getattr(ccxt, "icicibreeze", None)
+    if not current_shim or not hasattr(current_shim, "_is_breeze_shim"):
+        # Sync Shim
         class icicibreeze(ccxt.Exchange):  # noqa: N801
             def describe(self):
                 base = super().describe()
@@ -28,14 +31,64 @@ try:
                             "loadMarkets": True,
                             "fetchTicker": True,
                             "fetchOHLCV": True,
-                            "createOrder": False,
-                            "cancelOrder": False,
+                            "fetchOrder": True,
+                            "createOrder": True,
+                            "cancelOrder": True,
+                            "fetchOpenOrders": True,
+                            "fetchClosedOrders": True,
+                            "fetchOrders": True,
+                            "fetchMyTrades": True,
+                            "fetchBalance": True,
+                            "fetchOrderBook": True,
+                            "fetchCurrencies": False,
                         },
                     }
                 )
                 return base
 
         setattr(ccxt, "icicibreeze", icicibreeze)
+
+        # Async Shim (needed for Freqtrade validation)
+        try:
+            import ccxt.async_support as ccxt_async
+
+            if "icicibreeze" not in getattr(ccxt_async, "exchanges", []):
+                ccxt_async.exchanges.append("icicibreeze")
+
+            if not hasattr(ccxt_async, "icicibreeze"):
+
+                class icicibreeze_async(ccxt_async.Exchange):  # noqa: N801
+                    def describe(self):
+                        base = super().describe()
+                        base.update(
+                            {
+                                "id": "icicibreeze",
+                                "name": "ICICI Breeze (Shim)",
+                                "countries": ["IN"],
+                                "rateLimit": 1000,
+                                "has": {
+                                    "fetchMarkets": True,
+                                    "loadMarkets": True,
+                                    "fetchTicker": True,
+                                    "fetchOHLCV": True,
+                                    "fetchOrder": True,
+                                    "createOrder": True,
+                                    "cancelOrder": True,
+                                    "fetchOpenOrders": True,
+                                    "fetchClosedOrders": True,
+                                    "fetchOrders": True,
+                                    "fetchMyTrades": True,
+                                    "fetchBalance": True,
+                                    "fetchOrderBook": True,
+                                    "fetchCurrencies": False,
+                                },
+                            }
+                        )
+                        return base
+
+                setattr(ccxt_async, "icicibreeze", icicibreeze_async)
+        except ImportError:
+            pass
 
 except Exception as e:
     # Use print/logging to ensure visibility of shim failure during boot

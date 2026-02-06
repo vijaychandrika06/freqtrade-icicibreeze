@@ -3,6 +3,9 @@ import logging
 import sys
 import os
 
+# Ensure project root is in path
+sys.path.insert(0, os.getcwd())
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -10,14 +13,26 @@ logger = logging.getLogger(__name__)
 # This import is needed to register the shim
 try:
     import freqtrade.exchange.icicibreeze
-except ImportError:
-    logger.error("Could not import freqtrade.exchange.icicibreeze")
+    from freqtrade.exchange.icicibreeze import patch_ccxt
+
+    patch_ccxt()
+except ImportError as e:
+    logger.error(f"Could not import freqtrade.exchange.icicibreeze: {e}")
+    import traceback
+
+    traceback.print_exc()
+    sys.exit(1)
+except Exception as e:
+    logger.error(f"Unexpected error during import: {e}")
+    import traceback
+
+    traceback.print_exc()
     sys.exit(1)
 
 logger.info(f"ccxt.icicibreeze present: {hasattr(ccxt, 'icicibreeze')}")
 
 try:
-    ex = ccxt.icicibreeze({"enableRateLimit": True})
+    ex = ccxt.icicibreeze({"enableRateLimit": True, "breeze_mock": True})
     mk = ex.load_markets()
 
     logger.info(f"Markets count: {len(mk)}")

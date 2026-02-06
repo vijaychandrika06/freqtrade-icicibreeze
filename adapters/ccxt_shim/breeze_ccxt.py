@@ -11,9 +11,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from adapters.ops.circuit_breaker import CircuitBreakerGuard
-from adapters.telemetry.schema import Layer, Severity
-from adapters.telemetry.udp_bus import PORT_BREEZE, UdpTelemetryBus
+from adapters.telemetry.schema import Layer, Severity, PORT_BREEZE
+from adapters.telemetry.udp_bus import UdpTelemetryBus
 from adapters.time.clock import get_clock
 
 import ccxt
@@ -65,7 +64,7 @@ class BreezeCCXT(ccxt.Exchange):
         self._telemetry = UdpTelemetryBus(PORT_BREEZE, Layer.BREEZE, config.get("run_id"))
 
         # F2: Fail Fast for Credentials (Real Mode)
-        mock = config.get("breeze_mock", False)
+        mock = config.get("breeze_mock", False) or os.environ.get("BREEZE_MOCK") == "1"
         if not mock:
             key = config.get("exchange", {}).get("key", "")
             secret = config.get("exchange", {}).get("secret", "")
@@ -80,6 +79,9 @@ class BreezeCCXT(ccxt.Exchange):
 
         # P40: Idempotency
         self.idempotency = OrderIdempotency()
+
+        # P56: Balance Warning Init
+        self._last_balance_warning = 0.0
 
         # P18/P29: Paper Mode
         # Support both legacy flat flag and new nested structure

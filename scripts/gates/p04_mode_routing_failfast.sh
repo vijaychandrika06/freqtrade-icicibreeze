@@ -14,13 +14,17 @@ if [ "$GATE_MODE" == "pos" ]; then
     export BREEZE_MOCK=0
     unset BREEZE_API_KEY BREEZE_API_SECRET BREEZE_SESSION_TOKEN
     
-    freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data > "$LOG_FILE" 2>&1 || true
+    # Create keyless config
+    cat user_data/config_icicibreeze.json | jq 'del(.exchange.key, .exchange.secret, .icicibreeze.icici_mode)' > user_data/config_nokeys.json
+    
+    freqtrade list-markets -c user_data/config_nokeys.json --userdir user_data > "$LOG_FILE" 2>&1 || true
 
-    echo "Step 2: Assert robust error detection"
-    if grep -E "(API Key.*not found|BREEZE_API_KEY|credentials.*missing)" "$LOG_FILE"; then
-        echo "[OK] Correct error message found in logs (regex matched)"
+    echo "Step 2: Assert robust error detection (Safe Stub Fallback)"
+    # P55: We now default to Stub mode if keys are missing, instead of crashing.
+    if grep -E "(Initializing Icicibreeze in Stub mode)" "$LOG_FILE"; then
+        echo "[OK] Safe fallback to Stub mode verified"
     else
-        echo "[FAIL] Expected credential error message not found in logs"
+        echo "[FAIL] Expected Stub mode fallback not found in logs"
         finish_gate 1
     fi
     
