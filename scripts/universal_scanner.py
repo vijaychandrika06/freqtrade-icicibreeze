@@ -108,7 +108,7 @@ class UniversalScanner:
             df.set_index("timestamp", inplace=True)
             return df
         except Exception as e:
-            logger.error(f"Failed to fetch real OHLCV for {symbol}: {e}")
+            logger.exception(f"Failed to fetch real OHLCV for {symbol}: {e}")
             return pd.DataFrame()
 
     def _scan_candidate(self, underlying: str) -> Optional[Dict]:
@@ -311,8 +311,8 @@ class UniversalScanner:
                     )
                     pair = format_pair(spec)
                     tradable_pairs.append(pair)
-                except Exception as e:
-                    logger.warning(f"Failed to format pair for {item['underlying']}: {e}")
+                except Exception:
+                    logger.exception(f"Failed to format pair for {item['underlying']}")
 
         with pairs_file.open("w") as f:
             json.dump(tradable_pairs, f, indent=2)

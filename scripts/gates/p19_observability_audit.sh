@@ -48,7 +48,7 @@ if [ "$GATE_MODE" == "pos" ]; then
 
     # Run for 20s to ensure startup (timeout 20s)
     # We ignore the exit code because we expect to kill it or it might time out
-    timeout 20s "$FREQTRADE" trade --dry-run -c user_data/config_icicibreeze.json --userdir user_data -s IndiaEquitySmokeStrategy -vv > "$DRY_RUN_LOG" 2>&1 || true
+    BREEZE_MOCK=1 timeout 20s "$FREQTRADE" trade --dry-run -c user_data/config_icicibreeze.json --userdir user_data -s IndiaEquitySmokeStrategy -vv > "$DRY_RUN_LOG" 2>&1 || true
 
     if grep -q "Changing state to: RUNNING" "$DRY_RUN_LOG"; then
         echo "[OK] Found 'Changing state to: RUNNING'"

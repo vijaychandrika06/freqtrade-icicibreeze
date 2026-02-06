@@ -23,10 +23,7 @@ except ImportError as e:
     traceback.print_exc()
     sys.exit(1)
 except Exception as e:
-    logger.error(f"Unexpected error during import: {e}")
-    import traceback
-
-    traceback.print_exc()
+    logger.exception(f"Unexpected error during import: {e}")
     sys.exit(1)
 
 logger.info(f"ccxt.icicibreeze present: {hasattr(ccxt, 'icicibreeze')}")
