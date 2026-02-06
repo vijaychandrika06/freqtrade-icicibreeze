@@ -236,6 +236,10 @@ class BreezeCCXT(ccxt.Exchange):
         """
         Deterministic mock mode check.
         """
+        if self.config.get("breeze_mock") is True:
+            return True
+        if self.config.get("dry_run") is True:
+            return True
         if self.options.get("dry_run") is True:
             return True
         if self.options.get("mode") in {"mock", "dry_run"}:

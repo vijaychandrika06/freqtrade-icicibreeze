@@ -16,7 +16,7 @@ from adapters.ccxt_shim.breeze_ccxt import BreezeCCXT
 mode = os.environ.get("MODE", "mock")
 
 config = {
-    "dry_run": True,
+    "dry_run": (mode == "mock"),
     "breeze_mock": (mode == "mock"),
     "exchange": {"key": "k", "secret": "s"},
     "icicibreeze": {"session_token": "dummy"},
@@ -31,6 +31,9 @@ try:
         with mock.patch("adapters.ccxt_shim.breeze_ccxt.BreezeConnect"):
             ex = BreezeCCXT(config)
             bal = ex.fetch_balance()
+            import json
+            print(f"DEBUG: Type of bal: {type(bal)}")
+            print(f"DEBUG: Bal content: {bal}")
             print(f"Balance Info: {bal.get('info')}")
             if bal['info'].get('status') == 'unavailable':
                 print("[OK] Fallback returned")
