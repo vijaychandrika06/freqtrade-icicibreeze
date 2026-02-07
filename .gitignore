@@ -139,3 +139,10 @@ user_data.old_*/
 *.jsonl
 
 generated/
+
+# ---- local artifacts / junk ----
+user_data/backups/
+user_data/backtest_results/
+user_data/cache/
+user_data/.cache/
+coverage.xml
