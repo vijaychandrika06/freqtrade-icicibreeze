@@ -1,11 +1,10 @@
-#!/bin/bash
-set -euo pipefail
+GATE_ID="p47_options_valuation"
+source scripts/gates/common.sh "$GATE_ID" "$@"
 
-MODE="${1:-pos}"
-MODE="${MODE#--mode=}"
-
-if [ "$MODE" == "pos" ]; then
-    python3 scripts/p47_check_valuation.py pos
-elif [ "$MODE" == "neg" ]; then
-    python3 scripts/p47_check_valuation.py neg
+if [ "$GATE_MODE" == "pos" ]; then
+    "$PYTHON" scripts/p47_check_valuation.py pos || finish_gate $?
+elif [ "$GATE_MODE" == "neg" ]; then
+    "$PYTHON" scripts/p47_check_valuation.py neg || finish_gate $?
 fi
+
+finish_gate 0
