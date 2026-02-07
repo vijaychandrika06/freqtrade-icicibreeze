@@ -65,14 +65,22 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 PATH="$PWD/.venv/bin:$PATH"
 export PATH
 
-export PYTHON=".venv/bin/python"
-if [ ! -f "$PYTHON" ]; then
-    echo "ERROR: $PYTHON not found. Activate a venv first."
+# Resolution of Python and Freqtrade executables
+if [ -f ".venv/bin/python" ]; then
+    export PYTHON=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    export PYTHON="python3"
+else
+    echo "ERROR: python3 not found."
     exit 1
 fi
-export FREQTRADE=".venv/bin/freqtrade"
-if [ ! -f "$FREQTRADE" ]; then
-    echo "ERROR: $FREQTRADE not found. Ensure freqtrade is installed in the venv."
+
+if [ -f ".venv/bin/freqtrade" ]; then
+    export FREQTRADE=".venv/bin/freqtrade"
+elif command -v freqtrade >/dev/null 2>&1; then
+    export FREQTRADE="freqtrade"
+else
+    echo "ERROR: freqtrade not found."
     exit 1
 fi
 

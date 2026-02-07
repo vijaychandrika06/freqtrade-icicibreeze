@@ -6,36 +6,27 @@ from collections import defaultdict
 
 sys.path.append(os.getcwd())
 
-try:
-    from freqtrade.adapters.ccxt_shim.instrument import InstrumentSpec, InstrumentType, format_pair
-    from freqtrade.adapters.ccxt_shim.security_master import (
-        find_latest_master_file,
-        load_nfo_options_master,
-    )
-except ImportError:
-    from adapters.ccxt_shim.instrument import InstrumentSpec, InstrumentType, format_pair
-    from adapters.ccxt_shim.security_master import find_latest_master_file, load_nfo_options_master
+from adapters.ccxt_shim.instrument import InstrumentSpec, InstrumentType, format_pair
+from adapters.ccxt_shim.security_master import find_latest_master_file, load_nfo_options_master
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("list_icici_contracts")
 
 
 def _collect_option_index(
-    contracts: dict[tuple[str, str, float, str], dict[str, object]]
+    contracts: dict[tuple[str, str, float, str], dict[str, object]],
 ) -> dict[str, dict[str, dict[float, set[str]]]]:
     by_underlying: dict[str, dict[str, dict[float, set[str]]]] = defaultdict(
         lambda: defaultdict(lambda: defaultdict(set))
     )
-    for (underlying, expiry, strike, right) in contracts:
+    for underlying, expiry, strike, right in contracts:
         by_underlying[underlying][expiry][strike].add(right)
     return by_underlying
 
 
-def _collect_future_index(
-    futures: dict[tuple[str, str], dict[str, object]]
-) -> dict[str, set[str]]:
+def _collect_future_index(futures: dict[tuple[str, str], dict[str, object]]) -> dict[str, set[str]]:
     by_underlying: dict[str, set[str]] = defaultdict(set)
-    for (underlying, expiry) in futures:
+    for underlying, expiry in futures:
         by_underlying[underlying].add(expiry)
     return by_underlying
 
@@ -100,9 +91,7 @@ def list_contracts(
                 )
                 print(f"  FUT  {format_pair(fut_spec)}")
             if kind in {"opt", "both"}:
-                strikes_for_expiry = sorted(
-                    option_index.get(underlying, {}).get(expiry, {}).keys()
-                )
+                strikes_for_expiry = sorted(option_index.get(underlying, {}).get(expiry, {}).keys())
                 for strike in strikes_for_expiry[:strikes]:
                     rights = sorted(option_index[underlying][expiry][strike])
                     for right in rights:

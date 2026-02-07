@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/trader/work/freqtrade-icicibreeze
+cd "$(dirname "$0")/.."
 source .venv/bin/activate
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 

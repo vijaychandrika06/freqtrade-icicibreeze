@@ -1,102 +1,106 @@
 # flake8: noqa: F401
 # isort: off
 # --- ccxt shim registration for icicibreeze (must run early) ---
-try:
-    import ccxt  # type: ignore
-    import ccxt.async_support as ccxt_async  # type: ignore
+import ccxt  # type: ignore
+import ccxt.async_support as ccxt_async  # type: ignore
 
-    def _register(module):
-        ex_list = getattr(module, "exchanges", None)
-        if isinstance(ex_list, list) and "icicibreeze" not in ex_list:
-            ex_list.append("icicibreeze")
 
-        if not hasattr(module, "icicibreeze"):
-            is_async = "async_support" in module.__name__
+def _register(module):
+    ex_list = getattr(module, "exchanges", None)
+    if isinstance(ex_list, list) and "icicibreeze" not in ex_list:
+        ex_list.append("icicibreeze")
 
-            class IcicibreezeInitShim(module.Exchange):  # noqa: N801
-                def __init__(self, config={}):
-                    super().__init__(config)
-                    self.features = {"spot": {"fetchOHLCV": {"limit": 1000, "days": 100}}}
+    if not hasattr(module, "icicibreeze"):
+        is_async = "async_support" in module.__name__
 
-                def describe(self):
-                    base = super().describe()
-                    base.update(
-                        {
-                            "id": "icicibreeze",
-                            "name": "ICICI Breeze (Shim)",
-                            "countries": ["IN"],
-                            "rateLimit": 1000,
-                            "timeframes": {
-                                "1m": "1m",
-                                "5m": "5m",
-                                "15m": "15m",
-                                "30m": "30m",
-                                "1h": "1h",
-                                "4h": "4h",
-                                "1d": "1d",
-                            },
-                            "features": {"spot": {"fetchOHLCV": {"limit": 1000, "days": 100}}},
-                        }
-                    )
-                    base.get("has", {}).update(
-                        {
-                            "fetchMarkets": True,
-                            "loadMarkets": True,
-                            "fetchTicker": True,
-                            "fetchOHLCV": True,
-                            "fetchOrder": True,
-                            "createOrder": False,
-                            "cancelOrder": False,
-                        }
-                    )
-                    return base
+        class IcicibreezeInitShim(module.Exchange):  # noqa: N801
+            # Note: This lightweight shim exists to allow 'icicibreeze' to be recognized
+            # by Freqtrade during bootstrap (e.g. for --help or config validation)
+            # WITHOUT importing the heavy 'breeze_connect' dependency, which is
+            # handled by the full implementation in adapters/ccxt_shim/breeze_ccxt.py.
+            def __init__(self, config=None):
+                if config is None:
+                    config = {}
+                super().__init__(config)
+                self.features = {"spot": {"fetchOHLCV": {"limit": 1000, "days": 100}}}
 
-            mock_markets = [
-                {
-                    "symbol": "BTC/USDT",
-                    "id": "BTC-USDT",
-                    "base": "BTC",
-                    "quote": "USDT",
-                    "spot": True,
-                    "margin": False,
-                    "future": False,
-                    "precision": {"amount": 6, "price": 2},
-                    "limits": {"amount": {"min": 0.0001}, "cost": {"min": 1}},
-                    "active": True,
-                    "info": {},
-                },
-                {
-                    "symbol": "ETH/USDT",
-                    "id": "ETH-USDT",
-                    "base": "ETH",
-                    "quote": "USDT",
-                    "spot": True,
-                    "margin": False,
-                    "future": False,
-                    "precision": {"amount": 6, "price": 2},
-                    "limits": {"amount": {"min": 0.0001}, "cost": {"min": 1}},
-                    "active": True,
-                    "info": {},
-                },
-            ]
+            def describe(self):
+                base = super().describe()
+                base.update(
+                    {
+                        "id": "icicibreeze",
+                        "name": "ICICI Breeze (Shim)",
+                        "countries": ["IN"],
+                        "rateLimit": 1000,
+                        "timeframes": {
+                            "1m": "1m",
+                            "5m": "5m",
+                            "15m": "15m",
+                            "30m": "30m",
+                            "1h": "1h",
+                            "4h": "4h",
+                            "1d": "1d",
+                        },
+                        "features": {"spot": {"fetchOHLCV": {"limit": 1000, "days": 100}}},
+                    }
+                )
+                base.get("has", {}).update(
+                    {
+                        "fetchMarkets": True,
+                        "loadMarkets": True,
+                        "fetchTicker": True,
+                        "fetchOHLCV": True,
+                        "fetchOrder": True,
+                        "createOrder": True,  # Required for check_exchange
+                        "cancelOrder": True,  # Required for check_exchange
+                    }
+                )
+                return base
 
-            if is_async:
+        mock_markets = [
+            {
+                "symbol": "BTC/USDT",
+                "id": "BTC-USDT",
+                "base": "BTC",
+                "quote": "USDT",
+                "spot": True,
+                "margin": False,
+                "future": False,
+                "precision": {"amount": 6, "price": 2},
+                "limits": {"amount": {"min": 0.0001}, "cost": {"min": 1}},
+                "active": True,
+                "info": {},
+            },
+            {
+                "symbol": "ETH/USDT",
+                "id": "ETH-USDT",
+                "base": "ETH",
+                "quote": "USDT",
+                "spot": True,
+                "margin": False,
+                "future": False,
+                "precision": {"amount": 6, "price": 2},
+                "limits": {"amount": {"min": 0.0001}, "cost": {"min": 1}},
+                "active": True,
+                "info": {},
+            },
+        ]
 
-                async def fetch_markets(self, params={}):
-                    return mock_markets
-            else:
+        if is_async:
 
-                def fetch_markets(self, params={}):
-                    return mock_markets
+            async def fetch_markets(self, params=None):
+                return mock_markets
+        else:
 
-            icicibreeze.fetch_markets = fetch_markets
-            setattr(module, "icicibreeze", IcicibreezeInitShim)
+            def fetch_markets(self, params=None):
+                return mock_markets
 
-    _register(ccxt)
-    _register(ccxt_async)
+        IcicibreezeInitShim.fetch_markets = fetch_markets
+        setattr(module, "icicibreeze", IcicibreezeInitShim)
 
-except Exception:
-    pass
+
+_register(ccxt)
+_register(ccxt_async)
 # --- end shim ---
 
 from freqtrade.exchange.common import MAP_EXCHANGE_CHILDCLASS

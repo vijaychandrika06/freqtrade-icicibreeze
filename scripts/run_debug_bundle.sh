@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-cd /home/trader/work/freqtrade-icicibreeze
+cd "$(dirname "$0")/.."
 
 test -f .env
 test -f .venv/bin/activate
