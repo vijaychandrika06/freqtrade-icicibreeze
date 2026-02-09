@@ -82,6 +82,7 @@ ALL_GATES=(
     "p52_universal_funnel"
     "p53_telemetry_smoke"
     "p54_balance_contract"
+    "p55_debug_and_telemetry_smoke"
 )
 
 # Parse flags

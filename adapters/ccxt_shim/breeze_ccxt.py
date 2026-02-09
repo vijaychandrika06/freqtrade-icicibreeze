@@ -461,6 +461,16 @@ class BreezeCCXT(ccxt.Exchange):
                     "info": {},
                 }
             logger.warning("Option contract not found for whitelist entry: %s", format_pair(spec))
+            # Telemetry: contract resolution failure
+            self._telemetry.emit(
+                "contract_not_found",
+                {
+                    "pair": format_pair(spec),
+                    "reason": "option_not_in_master",
+                    "instrument_type": "option",
+                },
+                severity=Severity.WARN,
+            )
             return None
         return {
             "id": info["token"],
@@ -506,6 +516,16 @@ class BreezeCCXT(ccxt.Exchange):
                     "info": {},
                 }
             logger.warning("Future contract not found for whitelist entry: %s", format_pair(spec))
+            # Telemetry: contract resolution failure
+            self._telemetry.emit(
+                "contract_not_found",
+                {
+                    "pair": format_pair(spec),
+                    "reason": "future_not_in_master",
+                    "instrument_type": "future",
+                },
+                severity=Severity.WARN,
+            )
             return None
         return {
             "id": info["token"],

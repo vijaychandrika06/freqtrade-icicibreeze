@@ -91,8 +91,8 @@ class IndiaOptionsAutoStrategy(IStrategy):
             return dataframe
 
         informative = self.dp.get_pair_dataframe(pair=underlying_pair, timeframe=self.timeframe)
-        logger.error(
-            f"P46_TRACE: strategy={self.__class__.__name__} pair={pair} underlying={underlying_pair} inf_len={len(informative) if informative is not None else 'None'}"
+        logger.debug(
+            f"P46_TRACE: strategy={self.__class__.__name__} pair={pair} underlying={underlying_pair} inf_len={len(informative) if informative is not None else 0}"
         )
 
         # P46 Guard: Check if informative data is effectively missing

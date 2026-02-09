@@ -39,6 +39,33 @@ class UdpTelemetryBus:
         self._last_emit = defaultdict(float)  # key -> timestamp
         self._emit_counts = defaultdict(int)  # key -> count in window
 
+        # Emit startup ping if telemetry enabled
+        if self.level != TelemetryLevel.IDLE:
+            self._emit_startup_ping()
+
+    def _emit_startup_ping(self):
+        """Emit telemetry_ping event on initialization."""
+        payload = {
+            "telemetry_level": self.level.value,
+            "bind": self.host,
+            "port": self.port,
+            "layer": self.layer,
+        }
+        # Use direct emit to bypass level checks for ping
+        data = {
+            "ts_utc": get_clock().now_utc().isoformat(),
+            "layer": self.layer,
+            "event": "telemetry_ping",
+            "severity": "info",
+            "run_id": self.run_id,
+            "payload": payload,
+        }
+        try:
+            msg = json.dumps(data).encode("utf-8")
+            self._sock.sendto(msg, (self.host, self.port))
+        except Exception:
+            pass  # Silently ignore startup ping failures
+
     def emit(
         self,
         event: str,
