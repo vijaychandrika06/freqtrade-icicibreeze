@@ -5,7 +5,7 @@ from freqtrade.strategy import IStrategy
 
 
 # Dummy strategy - no longer loads but raises an exception.
-class TestStrategyLegacyV1(IStrategy):
+class TestStrategyBrokenV1(IStrategy):
     minimal_roi = {"40": 0.0, "30": 0.01, "20": 0.02, "0": 0.04}
     stoploss = -0.10
 

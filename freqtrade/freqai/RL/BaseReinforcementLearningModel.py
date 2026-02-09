@@ -23,7 +23,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 from freqtrade.exceptions import OperationalException
 from freqtrade.freqai.data_kitchen import FreqaiDataKitchen
 from freqtrade.freqai.freqai_interface import IFreqaiModel
-from freqtrade.freqai.RL.Base5ActionRLEnv import Actions, Base5ActionRLEnv
+from freqtrade.freqai.RL.Base5ActionRLEnv import Base5Actions, Base5ActionRLEnv
 from freqtrade.freqai.RL.BaseEnvironment import BaseActions, BaseEnvironment, Positions
 from freqtrade.freqai.tensorboard.TensorboardCallback import TensorboardCallback
 from freqtrade.persistence import Trade
@@ -435,7 +435,7 @@ class BaseReinforcementLearningModel(IFreqaiModel):
 
             # reward agent for entering trades
             if (
-                action in (Actions.Long_enter.value, Actions.Short_enter.value)
+                action in (Base5Actions.Long_enter.value, Base5Actions.Short_enter.value)
                 and self._position == Positions.Neutral
             ):
                 if rsi_now < 40:
@@ -445,7 +445,7 @@ class BaseReinforcementLearningModel(IFreqaiModel):
                 return 25 * factor
 
             # discourage agent from not entering trades
-            if action == Actions.Neutral.value and self._position == Positions.Neutral:
+            if action == Base5Actions.Neutral.value and self._position == Positions.Neutral:
                 return -1
 
             max_trade_duration = self.rl_config.get("max_trade_duration_candles", 300)
@@ -462,18 +462,18 @@ class BaseReinforcementLearningModel(IFreqaiModel):
             # discourage sitting in position
             if (
                 self._position in (Positions.Short, Positions.Long)
-                and action == Actions.Neutral.value
+                and action == Base5Actions.Neutral.value
             ):
                 return -1 * trade_duration / max_trade_duration
 
             # close long
-            if action == Actions.Long_exit.value and self._position == Positions.Long:
+            if action == Base5Actions.Long_exit.value and self._position == Positions.Long:
                 if pnl > self.profit_aim * self.rr:
                     factor *= self.rl_config["model_reward_parameters"].get("win_reward_factor", 2)
                 return float(pnl * factor)
 
             # close short
-            if action == Actions.Short_exit.value and self._position == Positions.Short:
+            if action == Base5Actions.Short_exit.value and self._position == Positions.Short:
                 if pnl > self.profit_aim * self.rr:
                     factor *= self.rl_config["model_reward_parameters"].get("win_reward_factor", 2)
                 return float(pnl * factor)

@@ -739,6 +739,7 @@ class BreezeCCXT(ccxt.Exchange):
                 "free": {"INR": 10000000.0},
                 "used": {"INR": 0.0},
                 "total": {"INR": 10000000.0},
+                "info": {"status": "ok", "mode": "mock"},
             }
 
         # Real Mode Implementation (P5 Safety Contract)

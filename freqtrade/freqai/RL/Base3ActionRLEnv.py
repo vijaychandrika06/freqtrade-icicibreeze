@@ -9,7 +9,7 @@ from freqtrade.freqai.RL.BaseEnvironment import BaseEnvironment, Positions
 logger = logging.getLogger(__name__)
 
 
-class Actions(Enum):
+class Base3Actions(Enum):
     Neutral = 0
     Buy = 1
     Sell = 2
@@ -22,10 +22,10 @@ class Base3ActionRLEnv(BaseEnvironment):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.actions = Actions
+        self.actions = Base3Actions
 
     def set_action_space(self):
-        self.action_space = spaces.Discrete(len(Actions))
+        self.action_space = spaces.Discrete(len(Base3Actions))
 
     def step(self, action: int):
         """
@@ -52,19 +52,19 @@ class Base3ActionRLEnv(BaseEnvironment):
 
         trade_type = None
         if self.is_tradesignal(action):
-            if action == Actions.Buy.value:
+            if action == Base3Actions.Buy.value:
                 if self._position == Positions.Short:
                     self._update_total_profit()
                 self._position = Positions.Long
                 trade_type = "long"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Sell.value and self.can_short:
+            elif action == Base3Actions.Sell.value and self.can_short:
                 if self._position == Positions.Long:
                     self._update_total_profit()
                 self._position = Positions.Short
                 trade_type = "short"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Sell.value and not self.can_short:
+            elif action == Base3Actions.Sell.value and not self.can_short:
                 self._update_total_profit()
                 self._position = Positions.Neutral
                 trade_type = "exit"
@@ -115,15 +115,17 @@ class Base3ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Buy while it is in a Positions.short
         """
         return (
-            (action == Actions.Buy.value and self._position == Positions.Neutral)
-            or (action == Actions.Sell.value and self._position == Positions.Long)
+            (action == Base3Actions.Buy.value and self._position == Positions.Neutral)
+            or (action == Base3Actions.Sell.value and self._position == Positions.Long)
             or (
-                action == Actions.Sell.value
+                action == Base3Actions.Sell.value
                 and self._position == Positions.Neutral
                 and self.can_short
             )
             or (
-                action == Actions.Buy.value and self._position == Positions.Short and self.can_short
+                action == Base3Actions.Buy.value
+                and self._position == Positions.Short
+                and self.can_short
             )
         )
 
@@ -133,8 +135,12 @@ class Base3ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Sell while it is in a Positions.Long
         """
         if self.can_short:
-            return action in [Actions.Buy.value, Actions.Sell.value, Actions.Neutral.value]
+            return action in [
+                Base3Actions.Buy.value,
+                Base3Actions.Sell.value,
+                Base3Actions.Neutral.value,
+            ]
         else:
-            if action == Actions.Sell.value and self._position != Positions.Long:
+            if action == Base3Actions.Sell.value and self._position != Positions.Long:
                 return False
             return True

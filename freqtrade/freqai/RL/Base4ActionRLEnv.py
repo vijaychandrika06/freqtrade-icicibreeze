@@ -9,7 +9,7 @@ from freqtrade.freqai.RL.BaseEnvironment import BaseEnvironment, Positions
 logger = logging.getLogger(__name__)
 
 
-class Actions(Enum):
+class Base4Actions(Enum):
     Neutral = 0
     Exit = 1
     Long_enter = 2
@@ -23,10 +23,10 @@ class Base4ActionRLEnv(BaseEnvironment):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.actions = Actions
+        self.actions = Base4Actions
 
     def set_action_space(self):
-        self.action_space = spaces.Discrete(len(Actions))
+        self.action_space = spaces.Discrete(len(Base4Actions))
 
     def step(self, action: int):
         """
@@ -53,19 +53,19 @@ class Base4ActionRLEnv(BaseEnvironment):
 
         trade_type = None
         if self.is_tradesignal(action):
-            if action == Actions.Neutral.value:
+            if action == Base4Actions.Neutral.value:
                 self._position = Positions.Neutral
                 trade_type = "neutral"
                 self._last_trade_tick = None
-            elif action == Actions.Long_enter.value:
+            elif action == Base4Actions.Long_enter.value:
                 self._position = Positions.Long
                 trade_type = "enter_long"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Short_enter.value:
+            elif action == Base4Actions.Short_enter.value:
                 self._position = Positions.Short
                 trade_type = "enter_short"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Exit.value:
+            elif action == Base4Actions.Exit.value:
                 self._update_total_profit()
                 self._position = Positions.Neutral
                 trade_type = "exit"
@@ -116,14 +116,14 @@ class Base4ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Long_exit while it is in a Positions.short
         """
         return not (
-            (action == Actions.Neutral.value and self._position == Positions.Neutral)
-            or (action == Actions.Neutral.value and self._position == Positions.Short)
-            or (action == Actions.Neutral.value and self._position == Positions.Long)
-            or (action == Actions.Short_enter.value and self._position == Positions.Short)
-            or (action == Actions.Short_enter.value and self._position == Positions.Long)
-            or (action == Actions.Exit.value and self._position == Positions.Neutral)
-            or (action == Actions.Long_enter.value and self._position == Positions.Long)
-            or (action == Actions.Long_enter.value and self._position == Positions.Short)
+            (action == Base4Actions.Neutral.value and self._position == Positions.Neutral)
+            or (action == Base4Actions.Neutral.value and self._position == Positions.Short)
+            or (action == Base4Actions.Neutral.value and self._position == Positions.Long)
+            or (action == Base4Actions.Short_enter.value and self._position == Positions.Short)
+            or (action == Base4Actions.Short_enter.value and self._position == Positions.Long)
+            or (action == Base4Actions.Exit.value and self._position == Positions.Neutral)
+            or (action == Base4Actions.Long_enter.value and self._position == Positions.Long)
+            or (action == Base4Actions.Long_enter.value and self._position == Positions.Short)
         )
 
     def _is_valid(self, action: int) -> bool:
@@ -132,12 +132,12 @@ class Base4ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Long_exit while it is in a Positions.short
         """
         # Agent should only try to exit if it is in position
-        if action == Actions.Exit.value:
+        if action == Base4Actions.Exit.value:
             if self._position not in (Positions.Short, Positions.Long):
                 return False
 
         # Agent should only try to enter if it is not in position
-        if action in (Actions.Short_enter.value, Actions.Long_enter.value):
+        if action in (Base4Actions.Short_enter.value, Base4Actions.Long_enter.value):
             if self._position != Positions.Neutral:
                 return False
 

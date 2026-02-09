@@ -9,7 +9,7 @@ from freqtrade.freqai.RL.BaseEnvironment import BaseEnvironment, Positions
 logger = logging.getLogger(__name__)
 
 
-class Actions(Enum):
+class Base5Actions(Enum):
     Neutral = 0
     Long_enter = 1
     Long_exit = 2
@@ -24,10 +24,10 @@ class Base5ActionRLEnv(BaseEnvironment):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.actions = Actions
+        self.actions = Base5Actions
 
     def set_action_space(self):
-        self.action_space = spaces.Discrete(len(Actions))
+        self.action_space = spaces.Discrete(len(Base5Actions))
 
     def step(self, action: int):
         """
@@ -54,24 +54,24 @@ class Base5ActionRLEnv(BaseEnvironment):
 
         trade_type = None
         if self.is_tradesignal(action):
-            if action == Actions.Neutral.value:
+            if action == Base5Actions.Neutral.value:
                 self._position = Positions.Neutral
                 trade_type = "neutral"
                 self._last_trade_tick = None
-            elif action == Actions.Long_enter.value:
+            elif action == Base5Actions.Long_enter.value:
                 self._position = Positions.Long
                 trade_type = "enter_long"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Short_enter.value:
+            elif action == Base5Actions.Short_enter.value:
                 self._position = Positions.Short
                 trade_type = "enter_short"
                 self._last_trade_tick = self._current_tick
-            elif action == Actions.Long_exit.value:
+            elif action == Base5Actions.Long_exit.value:
                 self._update_total_profit()
                 self._position = Positions.Neutral
                 trade_type = "exit_long"
                 self._last_trade_tick = None
-            elif action == Actions.Short_exit.value:
+            elif action == Base5Actions.Short_exit.value:
                 self._update_total_profit()
                 self._position = Positions.Neutral
                 trade_type = "exit_short"
@@ -121,17 +121,17 @@ class Base5ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Long_exit while it is in a Positions.short
         """
         return not (
-            (action == Actions.Neutral.value and self._position == Positions.Neutral)
-            or (action == Actions.Neutral.value and self._position == Positions.Short)
-            or (action == Actions.Neutral.value and self._position == Positions.Long)
-            or (action == Actions.Short_enter.value and self._position == Positions.Short)
-            or (action == Actions.Short_enter.value and self._position == Positions.Long)
-            or (action == Actions.Short_exit.value and self._position == Positions.Long)
-            or (action == Actions.Short_exit.value and self._position == Positions.Neutral)
-            or (action == Actions.Long_enter.value and self._position == Positions.Long)
-            or (action == Actions.Long_enter.value and self._position == Positions.Short)
-            or (action == Actions.Long_exit.value and self._position == Positions.Short)
-            or (action == Actions.Long_exit.value and self._position == Positions.Neutral)
+            (action == Base5Actions.Neutral.value and self._position == Positions.Neutral)
+            or (action == Base5Actions.Neutral.value and self._position == Positions.Short)
+            or (action == Base5Actions.Neutral.value and self._position == Positions.Long)
+            or (action == Base5Actions.Short_enter.value and self._position == Positions.Short)
+            or (action == Base5Actions.Short_enter.value and self._position == Positions.Long)
+            or (action == Base5Actions.Short_exit.value and self._position == Positions.Long)
+            or (action == Base5Actions.Short_exit.value and self._position == Positions.Neutral)
+            or (action == Base5Actions.Long_enter.value and self._position == Positions.Long)
+            or (action == Base5Actions.Long_enter.value and self._position == Positions.Short)
+            or (action == Base5Actions.Long_exit.value and self._position == Positions.Short)
+            or (action == Base5Actions.Long_exit.value and self._position == Positions.Neutral)
         )
 
     def _is_valid(self, action: int) -> bool:
@@ -141,12 +141,12 @@ class Base5ActionRLEnv(BaseEnvironment):
         e.g.: agent wants a Actions.Long_exit while it is in a Positions.short
         """
         # Agent should only try to exit if it is in position
-        if action in (Actions.Short_exit.value, Actions.Long_exit.value):
+        if action in (Base5Actions.Short_exit.value, Base5Actions.Long_exit.value):
             if self._position not in (Positions.Short, Positions.Long):
                 return False
 
         # Agent should only try to enter if it is not in position
-        if action in (Actions.Short_enter.value, Actions.Long_enter.value):
+        if action in (Base5Actions.Short_enter.value, Base5Actions.Long_enter.value):
             if self._position != Positions.Neutral:
                 return False
 
