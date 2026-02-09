@@ -56,7 +56,7 @@ cat > "$TEMP_CONF" <<EOF
 EOF
 
 echo ">>> P22 Smoke: 1. Listing Markets..."
-freqtrade list-markets -c "$TEMP_CONF" --print-json > user_data/p22_markets.json
+bash scripts/lib/ft_cmd.sh list-markets -c "$TEMP_CONF" --print-json > user_data/p22_markets.json
 
 if grep -q "RELIANCE/INR" user_data/p22_markets.json; then
     echo "[OK] RELIANCE/INR found in market list."
@@ -67,7 +67,7 @@ fi
 
 echo ">>> P22 Smoke: 2. Downloading Data (1 Day)..."
 # Using --days 1 to keep it fast and light
-freqtrade download-data -c "$TEMP_CONF" --days 1 -t 5m -p RELIANCE/INR
+bash scripts/lib/ft_cmd.sh download-data -c "$TEMP_CONF" --days 1 -t 5m -p RELIANCE/INR
 
 DATA_FILE="user_data/data/icicibreeze/RELIANCE_INR-5m.json"
 

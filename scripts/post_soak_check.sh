@@ -14,7 +14,7 @@ OUT="user_data/generated/${RUN}"
 mkdir -p "$OUT"
 
 # 1) Confirm markets expose options/futures (they currently do NOT)
-freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data \
+bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_icicibreeze.json --userdir user_data \
   |& tee "$OUT/list_markets.log"
 rg -n "FUT/INR|-CE/INR|-PE/INR" "$OUT/list_markets.log" || true
 

@@ -13,7 +13,7 @@ MARKETS_FILE="$ARTIFACT_DIR/markets.txt"
 if [ "$GATE_MODE" == "pos" ]; then
     echo "Step 1: Freqtrade list-markets and check for RELIANCE/INR (Positive)"
     # Capture all output
-    freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data > "$MARKETS_FILE" 2>&1 || finish_gate $?
+    bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_icicibreeze.json --userdir user_data > "$MARKETS_FILE" 2>&1 || finish_gate $?
 
     if grep -q "RELIANCE/INR" "$MARKETS_FILE"; then
         echo "[OK] RELIANCE/INR found in market list"

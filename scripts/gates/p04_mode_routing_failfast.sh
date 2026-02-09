@@ -18,7 +18,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     # P57 Fix: Remove icici_mode from exchange config too
     cat user_data/config_icicibreeze.json | jq 'del(.exchange.key, .exchange.secret, .exchange.icici_mode, .icicibreeze.icici_mode)' > user_data/config_nokeys.json
     
-    freqtrade list-markets -c user_data/config_nokeys.json --userdir user_data > "$LOG_FILE" 2>&1 || true
+    bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_nokeys.json --userdir user_data > "$LOG_FILE" 2>&1 || true
 
     echo "Step 2: Assert robust error detection (Safe Stub Fallback)"
     # P55: We now default to Stub mode if keys are missing, instead of crashing.
@@ -44,7 +44,7 @@ elif [ "$GATE_MODE" == "neg" ]; then
     export BREEZE_SESSION_TOKEN="test_token"
     export BREEZE_MOCK=0  # Real mode
 
-    freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data > "$LOG_FILE" 2>&1 || true
+    bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_icicibreeze.json --userdir user_data > "$LOG_FILE" 2>&1 || true
 
     if grep -E "(API Key.*not found|credentials.*missing)" "$LOG_FILE"; then
         echo "[FAIL] Fail Fast triggered despite credentials being present"

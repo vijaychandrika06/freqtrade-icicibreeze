@@ -23,7 +23,7 @@ rm -f "user_data/data/icicibreeze/RELIANCE_INR-5m.json"
 
 echo "Step 1: Download Mock Data (30 days)"
 # This will call fetch_ohlcv which will synthesize and persist to JSON
-freqtrade download-data -c "$CFG" --userdir user_data --pairs "$PAIR" --timeframes "$TF" --days "$DAYS" --erase
+bash scripts/lib/ft_cmd.sh download-data -c "$CFG" --userdir user_data --pairs "$PAIR" --timeframes "$TF" --days "$DAYS" --erase
 
 # JSON file produced by our mock persistence
 # Note: Freqtrade replaces / with _ in filenames
@@ -56,7 +56,7 @@ LOG_FILE="$ARTIFACT_DIR/backtest.log"
 BT_CFG="$ARTIFACT_DIR/config_bt.json"
 jq '.minimal_roi = {"0": -1} | .stoploss = -0.99' "$CFG" > "$BT_CFG"
 
-freqtrade backtesting -c "$BT_CFG" --userdir user_data -s "$STRAT" \
+bash scripts/lib/ft_cmd.sh backtesting -c "$BT_CFG" --userdir user_data -s "$STRAT" \
   --pairs "$PAIR" --timeframe "$TF" --timerange "$TIMERANGE" \
   --starting-balance 10000000 \
   --fee 0.0 \

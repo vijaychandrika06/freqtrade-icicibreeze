@@ -16,7 +16,7 @@ echo "${RUN_ID}" > "${OUT}/meta/run_id.txt"
 date -u > "${OUT}/meta/start_utc.txt"
 uname -a > "${OUT}/meta/uname.txt" || true
 python --version > "${OUT}/meta/python_version.txt" 2>&1 || true
-freqtrade --version > "${OUT}/meta/freqtrade_version.txt" 2>&1 || true
+bash scripts/lib/ft_cmd.sh --version > "${OUT}/meta/freqtrade_version.txt" 2>&1 || true
 
 # Load credentials without echoing them
 set +x
@@ -70,7 +70,7 @@ for L in "${LEVELS[@]}"; do
   export FT_DEBUG="${LTRIM}"
 
   # Capture list-markets + download-data minimal (optional, helps diagnose)
-  freqtrade list-markets -c "${CONFIG}" --userdir "${USERDIR}" \
+  bash scripts/lib/ft_cmd.sh list-markets -c "${CONFIG}" --userdir "${USERDIR}" \
     |& tee "${OUT}/terminal/list_markets_debug${LTRIM}.log" || true
   echo $? > "${OUT}/meta/rc_list_markets_${LTRIM}.txt"
 
@@ -84,7 +84,7 @@ for L in "${LEVELS[@]}"; do
   fi
 
   timeout "${RUN_MINS}m" \
-    freqtrade trade --dry-run -c "${CONFIG}" --userdir "${USERDIR}" -s "${STRATEGY}" ${VERB} \
+    bash scripts/lib/ft_cmd.sh trade --dry-run -c "${CONFIG}" --userdir "${USERDIR}" -s "${STRATEGY}" ${VERB} \
     |& tee "${OUT}/terminal/freqtrade_trade_debug${LTRIM}.log" || true
   echo $? > "${OUT}/meta/rc_trade_${LTRIM}.txt"
 

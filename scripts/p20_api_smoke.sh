@@ -28,7 +28,7 @@ cat user_data/config_icicibreeze.json | jq '.api_server = {
 
 # Start Freqtrade in background (Dry-run)
 echo "Starting Freqtrade API (Dry-Run)..."
-freqtrade trade --dry-run \
+bash scripts/lib/ft_cmd.sh trade --dry-run \
     -c /tmp/config_api_smoke.json \
     --userdir user_data \
     -s IndiaEquitySmokeStrategy \

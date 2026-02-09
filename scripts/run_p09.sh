@@ -19,12 +19,12 @@ python scripts/make_config_with_pairs.py \
 
 CFG="user_data/generated/config_p09.json"
 
-freqtrade list-markets -c "$CFG" --userdir user_data | rg -n "$UNDERLYING|/INR" | head -n 120
+bash scripts/lib/ft_cmd.sh list-markets -c "$CFG" --userdir user_data | rg -n "$UNDERLYING|/INR" | head -n 120
 
-freqtrade download-data -c "$CFG" --userdir user_data --timeframes 5m --days 5 -v | tail -n 140
+bash scripts/lib/ft_cmd.sh download-data -c "$CFG" --userdir user_data --timeframes 5m --days 5 -v | tail -n 140
 
-freqtrade backtesting -c "$CFG" --userdir user_data -s IndiaOptionsAutoStrategy \
+bash scripts/lib/ft_cmd.sh backtesting -c "$CFG" --userdir user_data -s IndiaOptionsAutoStrategy \
   > _p09_backtest.txt 2>&1 || true
 rg -n "Traceback|Fatal exception|ERROR|Total trades|Backtesting report" _p09_backtest.txt | head -n 180
 
-freqtrade trade --dry-run -c "$CFG" --userdir user_data -s IndiaOptionsAutoStrategy -vv | sed -n '1,260p'
+bash scripts/lib/ft_cmd.sh trade --dry-run -c "$CFG" --userdir user_data -s IndiaOptionsAutoStrategy -vv | sed -n '1,260p'

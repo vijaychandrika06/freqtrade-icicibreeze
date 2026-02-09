@@ -13,7 +13,7 @@ export BREEZE_MOCK=1
 
 if [ "$GATE_MODE" == "pos" ]; then
     echo "Step 1: Download Data (RELIANCE/INR, $TIMEFRAME, $DAYS days) (Positive)"
-    freqtrade download-data -c user_data/config_icicibreeze.json --userdir user_data --pairs RELIANCE/INR --timeframes "$TIMEFRAME" --days "$DAYS" || finish_gate $?
+    bash scripts/lib/ft_cmd.sh download-data -c user_data/config_icicibreeze.json --userdir user_data --pairs RELIANCE/INR --timeframes "$TIMEFRAME" --days "$DAYS" || finish_gate $?
 
     echo "Step 2: Verify Data File"
     DATA_FILE="user_data/data/icicibreeze/RELIANCE_INR-${TIMEFRAME}.feather"

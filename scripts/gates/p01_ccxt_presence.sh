@@ -14,7 +14,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     $PYTHON scripts/verify_ccxt_compliance.py || finish_gate $?
 
     echo "Step 2: Freqtrade list-markets (mock)"
-    freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data || finish_gate $?
+    bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_icicibreeze.json --userdir user_data || finish_gate $?
 
 elif [ "$GATE_MODE" == "neg" ]; then
     echo "Step 1: Verify ICICI Breeze in CCXT (Negative - Bad PYTHONPATH/No Site Packages)"

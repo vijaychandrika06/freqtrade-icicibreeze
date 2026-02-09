@@ -36,7 +36,7 @@ echo "[OK] ccxt.icicibreeze registered with timeframes"
 
 # S2: Verify list-markets returns INR markets (not crypto-only)
 echo ">>> Running list-markets to verify INR markets..."
-freqtrade list-markets \
+bash scripts/lib/ft_cmd.sh list-markets \
     -c user_data/config_icicibreeze.json \
     --userdir user_data \
     -v 2>&1 | tee user_data/generated/p57/list_markets.log

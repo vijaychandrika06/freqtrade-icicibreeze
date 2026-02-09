@@ -83,7 +83,7 @@ if [ "$WL_COUNT" -ne "$PAIR_COUNT" ]; then echo "ERROR: count mismatch"; finish_
 echo "=== STEP 7: Verify Freqtrade Market Resolution ==="
 export BREEZE_MOCK=1
 MARKETS_FILE="$ARTIFACT_DIR/markets.txt"
-freqtrade list-markets -c "$V1_CONFIG" --userdir user_data > "$MARKETS_FILE" || finish_gate $?
+bash scripts/lib/ft_cmd.sh list-markets -c "$V1_CONFIG" --userdir user_data > "$MARKETS_FILE" || finish_gate $?
 
 # Verify list-markets output contains at least one of the generated option pairs
 FIRST_PAIR=$(jq -r '.[0]' "$V1_PAIRS")
@@ -95,10 +95,10 @@ else
 fi
 
 echo "=== STEP 8: Download Data ($TIMEFRAME, $DAYS days) ==="
-freqtrade download-data -c "$V1_CONFIG" --userdir user_data --timeframes "$TIMEFRAME" --days "$DAYS" || finish_gate $?
+bash scripts/lib/ft_cmd.sh download-data -c "$V1_CONFIG" --userdir user_data --timeframes "$TIMEFRAME" --days "$DAYS" || finish_gate $?
 
 echo "=== STEP 9: Backtest with IndiaOptionsAutoStrategy ==="
-freqtrade backtesting -c "$V1_CONFIG" --userdir user_data --strategy IndiaOptionsAutoStrategy --timeframe "$TIMEFRAME" || finish_gate $?
+bash scripts/lib/ft_cmd.sh backtesting -c "$V1_CONFIG" --userdir user_data --strategy IndiaOptionsAutoStrategy --timeframe "$TIMEFRAME" || finish_gate $?
 
 echo "=== STEP 10: Dry-run Smoke Test ==="
 timeout 15s freqtrade trade -c "$V1_CONFIG" --userdir user_data --strategy IndiaOptionsAutoStrategy --dry-run || true

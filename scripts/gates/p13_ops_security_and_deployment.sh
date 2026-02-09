@@ -44,7 +44,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     echo "All required assets present."
 
     echo "Step 5: Running Stable Tests (CI Subset)"
-    freqtrade --help > /dev/null || finish_gate 1
+    bash scripts/lib/ft_cmd.sh --help > /dev/null || finish_gate 1
     if [ -d "tests/unit" ]; then
        pytest -q tests/unit > "$ARTIFACT_DIR/pytest_unit.log" 2>&1 || echo "Unit tests failed (non-blocking for this strict ops gate, but logged)"
     fi

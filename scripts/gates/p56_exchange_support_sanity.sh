@@ -39,7 +39,7 @@ echo "[OK] IciciBreeze exchange loaded"
 
 # S2: Check list-markets output
 echo ">>> Running list-markets..."
-freqtrade list-markets \
+bash scripts/lib/ft_cmd.sh list-markets \
     -c user_data/config_icicibreeze.json \
     --userdir user_data \
     -v 2>&1 | tee "$OUT_DIR/list_markets.log"

@@ -25,7 +25,7 @@ echo "Capturing environment snapshot to $OUT_FILE..."
     echo ""
     
     echo "=== Freqtrade Version ==="
-    freqtrade --version || echo "Freqtrade not found in PATH"
+    bash scripts/lib/ft_cmd.sh --version || echo "Freqtrade not found in PATH"
     echo ""
     
     # Optional: Pip freeze (commented out if too large, but requested in spec)

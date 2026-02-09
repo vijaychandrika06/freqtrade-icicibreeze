@@ -22,7 +22,7 @@ DATADIR="user_data/data/icicibreeze"
 
 if [ "$GATE_MODE" == "pos" ]; then
     echo "Step 1: Download Data (7 days) (Positive)"
-    freqtrade download-data -c "$CFG" --userdir user_data --timeframes "$TF" --days 7 || finish_gate $?
+    bash scripts/lib/ft_cmd.sh download-data -c "$CFG" --userdir user_data --timeframes "$TF" --days 7 || finish_gate $?
 
     echo "Step 2: Compute Timerange"
     # Use underlying cash pair for timerange computation as it's most reliable
@@ -41,7 +41,7 @@ if [ "$GATE_MODE" == "pos" ]; then
     BT_CFG="$ARTIFACT_DIR/config_bt.json"
     jq '.minimal_roi = {"0": -1} | .stoploss = -0.99' "$CFG" > "$BT_CFG"
 
-    freqtrade backtesting -c "$BT_CFG" \
+    bash scripts/lib/ft_cmd.sh backtesting -c "$BT_CFG" \
       --userdir user_data \
       -s IndiaEquitySmokeStrategy \
       --pairs "$PAIR" \

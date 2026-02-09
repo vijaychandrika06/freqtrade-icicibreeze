@@ -31,10 +31,10 @@ echo "--- 1. Compile Check ---"
 $PYTHON -m compileall -q -x 'user_data/generated' freqtrade adapters scripts user_data tests
 
 echo "--- 2. Show Config ---"
-freqtrade show-config -c user_data/config_icicibreeze.json --userdir user_data >"$OUT_DIR/show-config.json"
+bash scripts/lib/ft_cmd.sh show-config -c user_data/config_icicibreeze.json --userdir user_data >"$OUT_DIR/show-config.json"
 
 echo "--- 3. List Markets ---"
-freqtrade list-markets -c user_data/config_icicibreeze.json --userdir user_data >"$OUT_DIR/markets.txt"
+bash scripts/lib/ft_cmd.sh list-markets -c user_data/config_icicibreeze.json --userdir user_data >"$OUT_DIR/markets.txt"
 
 echo "--- 4. Ticker Smoke Test ---"
 $PYTHON scripts/smoke_icicibreeze_ticker.py >"$OUT_DIR/ticker.txt"
@@ -46,15 +46,15 @@ rm -f user_data/data/icicibreeze/RELIANCE_INR-*.json
 
 if [ "${ENABLE_BTC_TEST:-0}" -eq 1 ]; then
     echo "Downloading BTC/USDT..."
-    freqtrade download-data -c user_data/config_icicibreeze.json --userdir user_data --timeframes "$TIMEFRAME" --pairs BTC/USDT --days "$DAYS" -v >"$OUT_DIR/dl_btc.txt" 2>&1
+    bash scripts/lib/ft_cmd.sh download-data -c user_data/config_icicibreeze.json --userdir user_data --timeframes "$TIMEFRAME" --pairs BTC/USDT --days "$DAYS" -v >"$OUT_DIR/dl_btc.txt" 2>&1
 else
     echo "Skipping BTC/USDT download (ENABLE_BTC_TEST=0)"
 fi
-freqtrade download-data -c user_data/config_icicibreeze.json --userdir user_data --timeframes "$TIMEFRAME" --pairs RELIANCE/INR --days "$DAYS" -v >"$OUT_DIR/dl_inr.txt" 2>&1
+bash scripts/lib/ft_cmd.sh download-data -c user_data/config_icicibreeze.json --userdir user_data --timeframes "$TIMEFRAME" --pairs RELIANCE/INR --days "$DAYS" -v >"$OUT_DIR/dl_inr.txt" 2>&1
 
 echo "--- 6. Dry Run Trade Test ---"
 # Start trade in background, redirecting both stdout and stderr to capture logs
-freqtrade trade --dry-run -c user_data/config_icicibreeze.json --userdir user_data -s IndiaEquitySmokeStrategy -vv >"$OUT_DIR/trade.txt" 2>&1 &
+bash scripts/lib/ft_cmd.sh trade --dry-run -c user_data/config_icicibreeze.json --userdir user_data -s IndiaEquitySmokeStrategy -vv >"$OUT_DIR/trade.txt" 2>&1 &
 PID=$!
 echo "Freqtrade started with PID $PID. Waiting 15s for startup/running state..."
 sleep 15

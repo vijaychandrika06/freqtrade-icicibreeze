@@ -35,7 +35,7 @@ if [ "$GATE_MODE" == "pos" ]; then
 
     # Run list-markets (instantiates BreezeCCXT and triggers telemetry)
     echo "Running list-markets to trigger telemetry..."
-    freqtrade list-markets \
+    bash scripts/lib/ft_cmd.sh list-markets \
         -c user_data/config_icicibreeze.json \
         --userdir user_data \
         > user_data/generated/p55/list_markets.log 2>&1 || true
@@ -102,7 +102,7 @@ if [ "$GATE_MODE" == "neg" ]; then
 
     # Run list-markets
     echo "Running list-markets with telemetry disabled..."
-    freqtrade list-markets \
+    bash scripts/lib/ft_cmd.sh list-markets \
         -c user_data/config_icicibreeze.json \
         --userdir user_data \
         > user_data/generated/p55/list_markets_neg.log 2>&1 || true
