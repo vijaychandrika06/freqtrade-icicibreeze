@@ -46,6 +46,9 @@ for L in "${LEVELS[@]}"; do
   LTRIM="$(echo "${L}" | tr -d '[:space:]')"
   echo "RUN_DEBUG_LEVEL=${LTRIM}" | tee "${OUT}/meta/debug_${LTRIM}.txt"
 
+  # Export FT_DEBUG for telemetry activation
+  export FT_DEBUG="${LTRIM}"
+
   # Capture list-markets + download-data minimal (optional, helps diagnose)
   freqtrade list-markets -c "${CONFIG}" --userdir "${USERDIR}" \
     |& tee "${OUT}/terminal/list_markets_debug${LTRIM}.log" || true
