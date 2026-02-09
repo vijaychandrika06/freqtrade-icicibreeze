@@ -21,16 +21,17 @@ class UdpTelemetryBus:
     def __init__(self, port: int, layer: str, run_id: str | None = None):
         self.port = port
         self.layer = layer
-        self.host = os.environ.get("TELEMETRY_BIND", "127.0.0.1")
+        self.host = os.environ.get("FT_TELEMETRY_BIND", "127.0.0.1")
         self.run_id = run_id or f"run_{int(time.time())}"
 
-        # Level configuration
-        lvl = os.environ.get("TELEMETRY_LEVEL", "0")
+        # Level configuration - use FT_DEBUG
+        lvl_str = os.environ.get("FT_DEBUG", "0")
         try:
-            self.level = TelemetryLevel(lvl)
-        except ValueError:
+            lvl = int(lvl_str)
+            self.level = TelemetryLevel(str(lvl))
+        except (ValueError, KeyError):
             self.level = TelemetryLevel.IDLE
-            logger.warning(f"Invalid TELEMETRY_LEVEL {lvl}, defaulting to 0")
+            logger.warning(f"Invalid FT_DEBUG {lvl_str}, defaulting to 0")
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setblocking(False)

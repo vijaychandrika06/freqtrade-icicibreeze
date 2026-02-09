@@ -16,21 +16,18 @@ if [ "$GATE_MODE" == "pos" ]; then
     echo ">>> Gate P55: Positive (Telemetry Emission)..."
 
     export BREEZE_MOCK=1
-    export TELEMETRY_LEVEL=1
-    export TELEMETRY_BIND=127.0.0.1
-    export TELEMETRY_PORT_BREEZE=17100
-    export TELEMETRY_PORT_ENGINE=17101
-    export TELEMETRY_PORT_ORDERS=17102
-    export TELEMETRY_PORT_UI=17103
+    export FT_DEBUG=1
+    export FT_TELEMETRY_BIND=127.0.0.1
+    # Ports are hardcoded in code (17100-17103)
 
     # Start UDP Listeners for all 4 ports
-    nc -klu "$TELEMETRY_BIND" 17100 > user_data/generated/p55/telemetry_breeze.log &
+    nc -klu 127.0.0.1 17100 > user_data/generated/p55/telemetry_breeze.log &
     PID_BREEZE=$!
-    nc -klu "$TELEMETRY_BIND" 17101 > user_data/generated/p55/telemetry_engine.log &
+    nc -klu 127.0.0.1 17101 > user_data/generated/p55/telemetry_engine.log &
     PID_ENGINE=$!
-    nc -klu "$TELEMETRY_BIND" 17102 > user_data/generated/p55/telemetry_orders.log &
+    nc -klu 127.0.0.1 17102 > user_data/generated/p55/telemetry_orders.log &
     PID_ORDERS=$!
-    nc -klu "$TELEMETRY_BIND" 17103 > user_data/generated/p55/telemetry_ui.log &
+    nc -klu 127.0.0.1 17103 > user_data/generated/p55/telemetry_ui.log &
     PID_UI=$!
 
     # Wait for listeners to start
@@ -95,7 +92,7 @@ if [ "$GATE_MODE" == "neg" ]; then
     echo ">>> Gate P55: Negative (Telemetry Disabled)..."
 
     export BREEZE_MOCK=1
-    export TELEMETRY_LEVEL=0  # Disabled
+    export FT_DEBUG=0  # Disabled
 
     # Start UDP Listeners
     nc -klu 127.0.0.1 17100 > user_data/generated/p55/telemetry_neg_breeze.log &
