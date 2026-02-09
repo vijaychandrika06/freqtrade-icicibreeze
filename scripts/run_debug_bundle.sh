@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euo pipefail
+# DO NOT use set -e (we must bundle even if commands fail)
+set -uo pipefail
 cd "$(dirname "$0")/.."
 
 test -f .env
@@ -40,6 +41,25 @@ for P in "${PORTS[@]}"; do
 done
 echo "UDP_LISTENERS_STARTED ${TELEMETRY_BIND} ${TELEMETRY_PORTS}" > "${OUT}/telemetry/_status.txt"
 
+# Always stop listeners and bundle on exit (even if script fails)
+cleanup() {
+  echo "Cleanup: stopping UDP listeners..."
+  for P in "${PORTS[@]}"; do
+    if [ -f "${OUT}/telemetry/udp_${P}.pid" ]; then
+      kill "$(cat "${OUT}/telemetry/udp_${P}.pid")" 2>/dev/null || true
+    fi
+  done
+  date -u > "${OUT}/meta/end_utc.txt"
+  
+  # Always create tar bundle
+  echo "Creating bundle..."
+  TAR_OUT="${OUT}.tar.gz"
+  tar -czf "$TAR_OUT" -C user_data/generated "$(basename "$OUT")" > "${OUT}/meta/tar_stdout.txt" 2>&1
+  echo $? > "${OUT}/meta/rc_tar.txt"
+  echo "BUNDLE=$TAR_OUT"
+}
+trap cleanup EXIT
+
 # Run debug levels sequentially
 IFS=',' read -r -a LEVELS <<< "${DEBUG_LEVELS}"
 for L in "${LEVELS[@]}"; do
@@ -52,6 +72,7 @@ for L in "${LEVELS[@]}"; do
   # Capture list-markets + download-data minimal (optional, helps diagnose)
   freqtrade list-markets -c "${CONFIG}" --userdir "${USERDIR}" \
     |& tee "${OUT}/terminal/list_markets_debug${LTRIM}.log" || true
+  echo $? > "${OUT}/meta/rc_list_markets_${LTRIM}.txt"
 
   # Main dry-run trade loop (timeboxed)
   # Use -vv for more verbosity; Freqtrade does not reliably accept --debug=2 everywhere, so map:
@@ -65,6 +86,7 @@ for L in "${LEVELS[@]}"; do
   timeout "${RUN_MINS}m" \
     freqtrade trade --dry-run -c "${CONFIG}" --userdir "${USERDIR}" -s "${STRATEGY}" ${VERB} \
     |& tee "${OUT}/terminal/freqtrade_trade_debug${LTRIM}.log" || true
+  echo $? > "${OUT}/meta/rc_trade_${LTRIM}.txt"
 
   # Snapshot key artifacts after each run (best-effort)
   if [ -d user_data/generated/p51 ]; then
@@ -76,14 +98,13 @@ for L in "${LEVELS[@]}"; do
   fi
 done
 
-# Stop UDP listeners
-for P in "${PORTS[@]}"; do
-  if [ -f "${OUT}/telemetry/udp_${P}.pid" ]; then
-    kill "$(cat "${OUT}/telemetry/udp_${P}.pid")" 2>/dev/null || true
-  fi
-done
-date -u > "${OUT}/meta/end_utc.txt"
+# Post-run quick facts (telemetry line counts)
+{
+  echo "lines_udp_17100=$(wc -l < "${OUT}/telemetry/udp_17100.log" 2>/dev/null || echo 0)"
+  echo "lines_udp_17101=$(wc -l < "${OUT}/telemetry/udp_17101.log" 2>/dev/null || echo 0)"
+  echo "lines_udp_17102=$(wc -l < "${OUT}/telemetry/udp_17102.log" 2>/dev/null || echo 0)"
+  echo "lines_udp_17103=$(wc -l < "${OUT}/telemetry/udp_17103.log" 2>/dev/null || echo 0)"
+} > "${OUT}/meta/telemetry_counts.txt" 2>&1 || true
 
-# Bundle
-tar -czf "${OUT}.tar.gz" "${OUT}"
-echo "BUNDLE=${OUT}.tar.gz"
+# Cleanup and bundling will happen automatically via trap EXIT
+exit 0
