@@ -63,6 +63,7 @@ def find_latest_master_file(
         search_paths = [
             "user_data/data/icicibreeze/",
             "src/data/icicibreeze/",
+            "user_data/cache/security_master/",
             "user_data/data/",
             "src/data/",
         ]

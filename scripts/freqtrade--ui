@@ -15,9 +15,24 @@ source .venv/bin/activate
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
 # 0. Kill existing instances on $PORT
+# 0. Kill existing instances on $PORT
 echo "Cleaning up existing instances on port $PORT..."
 fuser -k "$PORT/tcp" >/dev/null 2>&1 || true
-sleep 1 # Wait for socket release
+
+# Wait for port release (up to 10s)
+for i in {1..10}; do
+    if ! lsof -i ":$PORT" >/dev/null 2>&1; then
+        echo "Port $PORT released."
+        break
+    fi
+    echo "Waiting for port $PORT to be released..."
+    sleep 1
+done
+
+if lsof -i ":$PORT" >/dev/null 2>&1; then
+    echo "ERROR: Port $PORT is still in use. Please kill the process manually."
+    exit 1
+fi
 
 # Ensure UI assets exist (idempotent)
 echo "Ensuring UI assets are installed..."
