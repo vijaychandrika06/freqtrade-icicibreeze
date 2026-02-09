@@ -3,7 +3,7 @@ import logging
 import numpy as np
 
 from freqtrade.freqai.prediction_models.ReinforcementLearner import ReinforcementLearner
-from freqtrade.freqai.RL.Base4ActionRLEnv import Actions, Base4ActionRLEnv, Positions
+from freqtrade.freqai.RL.Base4ActionRLEnv import Base4Actions, Base4ActionRLEnv, Positions
 
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,18 @@ class ReinforcementLearner_test_4ac(ReinforcementLearner):
             factor = 100.0
 
             # reward agent for entering trades
-            if (
-                action in (Actions.Long_enter.value, Actions.Short_enter.value)
-                and self._position == Positions.Neutral
-            ):
+            if self.is_tradesignal(action):
+                if action == Base4Actions.Neutral.value:
+                    self._position = Positions.Neutral
+                elif action == Base4Actions.Long_enter.value:
+                    self._position = Positions.Long
+                elif action == Base4Actions.Short_enter.value:
+                    self._position = Positions.Short
+                elif action == Base4Actions.Exit.value:
+                    self._position = Positions.Neutral
                 return 25
             # discourage agent from not entering trades
-            if action == Actions.Neutral.value and self._position == Positions.Neutral:
+            if action == Base4Actions.Neutral.value and self._position == Positions.Neutral:
                 return -1
 
             max_trade_duration = self.rl_config.get("max_trade_duration_candles", 300)
@@ -55,18 +60,18 @@ class ReinforcementLearner_test_4ac(ReinforcementLearner):
             # discourage sitting in position
             if (
                 self._position in (Positions.Short, Positions.Long)
-                and action == Actions.Neutral.value
+                and action == Base4Actions.Neutral.value
             ):
                 return -1 * trade_duration / max_trade_duration
 
             # close long
-            if action == Actions.Exit.value and self._position == Positions.Long:
+            if action == Base4Actions.Exit.value and self._position == Positions.Long:
                 if pnl > self.profit_aim * self.rr:
                     factor *= self.rl_config["model_reward_parameters"].get("win_reward_factor", 2)
                 return float(rew * factor)
 
             # close short
-            if action == Actions.Exit.value and self._position == Positions.Short:
+            if action == Base4Actions.Exit.value and self._position == Positions.Short:
                 if pnl > self.profit_aim * self.rr:
                     factor *= self.rl_config["model_reward_parameters"].get("win_reward_factor", 2)
                 return float(rew * factor)

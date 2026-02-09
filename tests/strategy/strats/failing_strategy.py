@@ -5,5 +5,5 @@ import nonexiting_module  # noqa
 from freqtrade.strategy.interface import IStrategy
 
 
-class TestStrategyLegacyV1(IStrategy):
+class TestStrategyFailingImport(IStrategy):
     pass

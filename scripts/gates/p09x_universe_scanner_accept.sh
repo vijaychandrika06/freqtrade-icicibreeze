@@ -40,6 +40,11 @@ $PYTHON "$GEN_WHITELIST_PY" \
     --pairs "$V1_PAIRS" \
     --out-config "$V1_CONFIG"
 
+# Publish config for downstream gates
+mkdir -p "user_data/generated"
+cp "$V1_CONFIG" "user_data/generated/config_p09x_v1.json"
+echo "Published config to user_data/generated/config_p09x_v1.json"
+
 echo "=== STEP 3: Run Universe Scan (Pass 2) ==="
 $PYTHON "$UNIVERSE_SCAN_PY" \
     --config "$STRATEGY_YAML" \

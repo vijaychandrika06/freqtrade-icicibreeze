@@ -464,6 +464,7 @@ def main() -> None:
     state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
 
     tmp_state = state_path.with_suffix(".tmp")
+    tmp_state.parent.mkdir(parents=True, exist_ok=True)
     with tmp_state.open("w") as f:
         json.dump(state, f, indent=2)
     tmp_state.replace(state_path)
@@ -490,6 +491,7 @@ def main() -> None:
     }
 
     tmp_cache = cache_path.with_suffix(".tmp")
+    tmp_cache.parent.mkdir(parents=True, exist_ok=True)
     with tmp_cache.open("w") as f:
         json.dump(cache, f, indent=2)
     tmp_cache.replace(cache_path)

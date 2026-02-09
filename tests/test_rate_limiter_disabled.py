@@ -3,7 +3,7 @@ from unittest import mock
 from adapters.ccxt_shim.rate_limiter import RateLimiter
 
 
-class FakeClock:
+class DisabledFakeClock:
     def __init__(self):
         self.time = 1000.0
 
@@ -15,7 +15,7 @@ class FakeClock:
 
 
 def test_rate_limiter_disabled():
-    clock = FakeClock()
+    clock = DisabledFakeClock()
     # Set Env to Disable Rate Limiter
     with mock.patch.dict(os.environ, {"FT_RATE_LIMIT_DISABLE": "1"}):
         rl = RateLimiter(now_fn=clock.now, sleep_fn=clock.sleep)

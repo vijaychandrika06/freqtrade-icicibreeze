@@ -60,6 +60,8 @@ python3 "$CHECK_PY" || finish_gate 1
 
 echo ">>> [POS] Real Mode Safety Check"
 export MODE="real"
+# Unset BREEZE_MOCK to ensure strict real mode logic is tested
+unset BREEZE_MOCK
 python3 "$CHECK_PY" || finish_gate 1
 
 echo ">>> Gate P54: SUCCESS"

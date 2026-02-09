@@ -3,7 +3,7 @@ import logging
 import numpy as np
 
 from freqtrade.freqai.prediction_models.ReinforcementLearner import ReinforcementLearner
-from freqtrade.freqai.RL.Base3ActionRLEnv import Actions, Base3ActionRLEnv, Positions
+from freqtrade.freqai.RL.Base3ActionRLEnv import Base3Actions, Base3ActionRLEnv, Positions
 
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,12 @@ class ReinforcementLearner_test_3ac(ReinforcementLearner):
 
             # reward agent for entering trades
             if (
-                action in (Actions.Buy.value, Actions.Sell.value)
+                action in (Base3Actions.Buy.value, Base3Actions.Sell.value)
                 and self._position == Positions.Neutral
             ):
                 return 25
             # discourage agent from not entering trades
-            if action == Actions.Neutral.value and self._position == Positions.Neutral:
+            if action == Base3Actions.Neutral.value and self._position == Positions.Neutral:
                 return -1
 
             max_trade_duration = self.rl_config.get("max_trade_duration_candles", 300)
@@ -54,15 +54,23 @@ class ReinforcementLearner_test_3ac(ReinforcementLearner):
 
             # discourage sitting in position
             if self._position in (Positions.Short, Positions.Long) and (
-                action == Actions.Neutral.value
-                or (action == Actions.Sell.value and self._position == Positions.Short)
-                or (action == Actions.Buy.value and self._position == Positions.Long)
+                action == Base3Actions.Neutral.value
+                or (action == Base3Actions.Sell.value and self._position == Positions.Short)
+                or (action == Base3Actions.Buy.value and self._position == Positions.Long)
             ):
                 return -1 * trade_duration / max_trade_duration
 
+            if self.is_tradesignal(action):
+                if action == Base3Actions.Buy.value:
+                    self._position = Positions.Long
+                elif action == Base3Actions.Sell.value and self.can_short:
+                    self._position = Positions.Short
+                elif action == Base3Actions.Sell.value and not self.can_short:
+                    self._position = Positions.Neutral
+
             # close position
-            if (action == Actions.Buy.value and self._position == Positions.Short) or (
-                action == Actions.Sell.value and self._position == Positions.Long
+            if (action == Base3Actions.Buy.value and self._position == Positions.Short) or (
+                action == Base3Actions.Sell.value and self._position == Positions.Long
             ):
                 if pnl > self.profit_aim * self.rr:
                     factor *= self.rl_config["model_reward_parameters"].get("win_reward_factor", 2)

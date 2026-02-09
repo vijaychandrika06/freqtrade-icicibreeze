@@ -17,7 +17,7 @@ def rate_limiter_sleep():
         yield RateLimiter()
 
 
-class FakeClock:
+class SleepFakeClock:
     def __init__(self):
         self.time = 1000000.0
 
@@ -29,7 +29,7 @@ class FakeClock:
 
 
 def test_sleep_mode_delays():
-    clock = FakeClock()
+    clock = SleepFakeClock()
 
     with mock.patch.dict(
         os.environ,

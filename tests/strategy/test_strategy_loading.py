@@ -501,7 +501,7 @@ def test_missing_implements(default_conf, caplog):
 def test_call_deprecated_function(default_conf):
     default_location = Path(__file__).parent / "strats/broken_strats/"
     del default_conf["timeframe"]
-    default_conf.update({"strategy": "TestStrategyLegacyV1", "strategy_path": default_location})
+    default_conf.update({"strategy": "TestStrategyBrokenV1", "strategy_path": default_location})
     with pytest.raises(
         OperationalException, match=r"Strategy Interface v1 is no longer supported.*"
     ):

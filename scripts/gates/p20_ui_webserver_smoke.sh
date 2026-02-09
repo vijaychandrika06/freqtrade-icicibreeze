@@ -12,7 +12,11 @@ require_timeout
 export BREEZE_MOCK=1
 export FT_RATE_LIMIT_DISABLE=1
 
-IN_CONFIG="user_data/generated/manual_select/config.json"
+IN_CONFIG="user_data/generated/config_p09x_v1.json"
+# Fallback if p09x config missing (e.g. running p20 in isolation)
+if [ ! -f "$IN_CONFIG" ]; then
+    IN_CONFIG="user_data/config_icicibreeze.json"
+fi
 OUT_CONFIG="$ARTIFACT_DIR/config_ui.json"
 
 if [ "$GATE_MODE" == "pos" ]; then

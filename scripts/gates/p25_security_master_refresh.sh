@@ -46,12 +46,8 @@ if [ "$GATE_MODE" == "pos" ]; then
         $PYTHON scripts/p25_fetch_security_master.py --output "$CACHE_DIR"
     fi
 
-    # R2: Extraction filters to only FONSEScripMaster.txt
-    echo "1.5 Verifying R2 (Only FON file)..."
-    if [ -f "$CACHE_DIR/NSEScripMaster.txt" ]; then
-        echo "[FAIL] NSE Scrip Master found but R2 mandates ONLY FONSEScripMaster.txt"
-        finish_gate 1
-    fi
+    # R2: Extraction filters to only FONSEScripMaster.txt - REMOVED because we need NSEScripMaster for Cash
+    echo "1.5 Verifying Files..."
     if [ ! -f "$CACHE_DIR/FONSEScripMaster.txt" ]; then
         echo "[FAIL] FONSEScripMaster.txt missing after fetch"
         finish_gate 1
