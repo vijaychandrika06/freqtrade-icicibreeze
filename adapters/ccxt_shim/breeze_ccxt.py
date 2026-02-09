@@ -349,10 +349,8 @@ class BreezeCCXT(ccxt.Exchange):
 
         # Mock Mode Bypass for Synthetic/Test Symbols not in Master
         if self._is_mock_mode():
-            is_mock_pair = (
-                (spec.underlying == "BTC" and spec.quote == "USDT")
-                or (spec.underlying in self._MOCK_BASE_PRICES)
-                or (spec.underlying in {"NIFTY", "BANKNIFTY"})
+            is_mock_pair = (spec.underlying in self._MOCK_BASE_PRICES) or (
+                spec.underlying in {"NIFTY", "BANKNIFTY", "RELIANCE"}
             )
 
             # If it's a known mock symbol and NOT in master, return synthetic params
@@ -548,13 +546,13 @@ class BreezeCCXT(ccxt.Exchange):
     def _fetch_cash_market(self, spec: InstrumentSpec, cash_symbols: dict) -> dict | None:
         info = cash_symbols.get(spec.underlying)
         if not info and self._is_mock_mode():
-            # Synthetic Index Cash or Mock Pairs support (BTC/USDT, NIFTY/INR etc)
+            # Synthetic Index Cash or Mock Pairs support (NIFTY/INR, RELIANCE/INR etc)
             is_index = spec.underlying in self._MOCK_BASE_PRICES or spec.underlying in {
                 "NIFTY",
                 "BANKNIFTY",
+                "RELIANCE",
             }
-            is_mock_pair = spec.underlying == "BTC" and spec.quote == "USDT"
-            if is_index or is_mock_pair:
+            if is_index:
                 info = {
                     "token": f"mock_{spec.underlying}",
                     "symbol": spec.underlying,

@@ -83,6 +83,7 @@ ALL_GATES=(
     "p53_telemetry_smoke"
     "p54_balance_contract"
     "p55_debug_and_telemetry_smoke"
+    "p56_exchange_support_sanity"
 )
 
 # Parse flags
